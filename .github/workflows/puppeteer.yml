@@ -25,24 +25,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            libasound2t64 \
-            libatk-bridge2.0-0t64 \
-            libatk1.0-0t64 \
-            libcairo2t64 \
-            libcups2t64 \
-            libdrm2t64 \
-            libgbm1t64 \
-            libgtk-4.1-0t64 \
-            libnss3t64 \
-            libpango-1.0-0t64 \
-            libxcomposite1t64 \
-            libxdamage1t64 \
-            libxfixes3t64 \
-            libxkbcommon0t64 \
-            libxrandr2t64 \
-            fonts-liberation \
-            xdg-utils \
-            wget
+
 
       - name: Run Puppeteer Script
         run: node puppeteer-script.js
