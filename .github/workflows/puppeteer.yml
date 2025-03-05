@@ -1,14 +1,16 @@
-name: Run Puppeteer Script
+name: Puppeteer Automation
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: # Run manually
+  schedule:
+    - cron: '0 0 * * *' # Daily at midnight UTC (optional)
 
 jobs:
-  puppeteer-job:
-    runs-on: ubuntu-latest  # Ubuntu 24.04
+  run-puppeteer:
+    runs-on: ubuntu-latest # Ubuntu 24.04
 
     steps:
-      - name: Checkout Code
+      - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Setup Node.js
@@ -16,10 +18,10 @@ jobs:
         with:
           node-version: 20.x
 
-      - name: Install Dependencies
+      - name: Install Puppeteer
         run: npm install puppeteer
 
-      - name: Install System Libraries (Ubuntu 24.04 Fix)
+      - name: Install Ubuntu 24.04 Dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -28,17 +30,19 @@ jobs:
             libatk1.0-0t64 \
             libcairo2t64 \
             libcups2t64 \
+            libdrm2t64 \
             libgbm1t64 \
-            libgtk-4.1-0t64 \  # Updated for GTK 4
+            libgtk-4.1-0t64 \
+            libnss3t64 \
             libpango-1.0-0t64 \
             libxcomposite1t64 \
             libxdamage1t64 \
             libxfixes3t64 \
+            libxkbcommon0t64 \
             libxrandr2t64 \
-            libnss3t64 \       # Added missing dependency
-            libdrm2t64 \       # Added missing dependency
             fonts-liberation \
-            xdg-utils
+            xdg-utils \
+            wget
 
       - name: Run Puppeteer Script
         run: node puppeteer-script.js
