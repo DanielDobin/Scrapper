@@ -1,3 +1,0 @@
-git add .github/workflows/puppeteer.yml your-script.js
-git commit -m "Add Puppeteer GitHub Action"
-git push origin main
