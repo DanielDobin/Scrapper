@@ -21,7 +21,8 @@ jobs:
       - name: Install Puppeteer
         run: npm install puppeteer
 
-
+      - name: Install Puppeteer
+        run: npm install puppeteer
 
       - name: Run Puppeteer Script
         run: node puppeteer-script.js
