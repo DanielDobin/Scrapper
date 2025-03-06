@@ -1,27 +1,41 @@
 const puppeteer = require('puppeteer');
 
 (async () => {
-  // Required flags for headless environments
   const browser = await puppeteer.launch({
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage'
-    ]
+    headless: "new", // Required for GitHub Actions
+    args: ['--no-sandbox', '--disable-setuid-sandbox']
   });
 
   try {
     const page = await browser.newPage();
-    await page.goto('https://example.com');
     
-    // Take screenshot proof
-    await page.screenshot({ path: 'example.png' });
-    console.log('Screenshot saved!');
+    // Navigate to login page
+    await page.goto('https://www.uchat.com.au/login', { waitUntil: 'networkidle2' });
 
-    // Get page title
-    const title = await page.title();
-    console.log(`Page Title: ${title}`);
+    // Fill credentials
+    await page.type('input[name="email"]', 'automaticalmivneisrael@gmail.com');
+    await page.type('input[name="password"]', 'Automatical Mivne Israel blue Shirt@2');
 
+    // Submit form
+    await Promise.all([
+      page.waitForNavigation({ waitUntil: 'networkidle2' }),
+      page.click('button[type="submit"]')
+    ]);
+
+    // Wait for redirect to workspace page (modify selector as needed)
+    await page.waitForSelector('.dashboard', { timeout: 10000 });
+
+    // Get workspace ID from URL
+    const url = await page.url();
+    const workspaceId = url.match(/\/accounts\/(\d+)/)?.[1];
+    
+    if (!workspaceId) throw new Error('Workspace ID not found in URL');
+    
+    console.log('Workspace ID:', workspaceId);
+
+  } catch (error) {
+    console.error('Error:', error.message);
+    process.exit(1);
   } finally {
     await browser.close();
   }
