@@ -1,11 +1,11 @@
-name: Puppeteer Automation
+name: Uchat Automation
 
 on:
   workflow_dispatch:
 
 jobs:
-  run-puppeteer:
-    runs-on: ubuntu-22.04  # ✅ Use older Ubuntu 22.04 (stable)
+  run-automation:
+    runs-on: ubuntu-22.04
 
     steps:
       - name: Checkout code
@@ -39,5 +39,16 @@ jobs:
             fonts-liberation \
             xdg-utils
 
-      - name: Run Puppeteer Script
+      - name: Run Automation
         run: node puppeteer-script.js
+
+      - name: Save Workspace ID
+        run: |
+          echo "WORKSPACE_ID=$(grep 'Workspace ID:' ${{ github.workflow }}-${{ github.run_id }}.log | awk '{print $NF}')" >> $GITHUB_ENV
+
+      - name: Upload Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: automation-results
+          path: |
+            ${{ github.workflow }}-${{ github.run_id }}.log
