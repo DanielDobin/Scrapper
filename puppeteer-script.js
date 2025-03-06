@@ -14,8 +14,8 @@ const puppeteer = require('puppeteer');
     console.log('Loaded login page');
 
     // Fill credentials (update selectors if needed)
-    await page.type('input[name="email"]', 'automaticalmivneisrael@gmail.com');
-    await page.type('input[name="password"]', 'Automatical Mivne Israel blue Shirt@2');
+    await page.type('input[name="email"]', 'office.automatical@gmail.com');
+    await page.type('input[name="password"]', 'Automatical Pass Grey Donkey3');
     console.log('Filled credentials');
 
     // Submit form
