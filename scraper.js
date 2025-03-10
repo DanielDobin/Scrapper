@@ -13,8 +13,8 @@ const config = {
   maxPrice: 10000,
   baseUrl: 'https://www.yad2.co.il/vehicles/cars',
   selectors: {
-    priceFilter: 'input[data-test-id="price-to"]', // Verified working selector
-    listItem: 'div.feedItem', // Updated list item selector
+    priceFilter: 'input[data-test-id="price-to"]',
+    listItem: 'div.feedItem',
     title: 'h2.title',
     price: 'div.price',
     year: 'div.vehicle-year',
@@ -24,11 +24,18 @@ const config = {
   screenshotPath: 'screenshots'
 };
 
-async function takeScreenshot(page, name) {
+// Initialize page outside try block
+let page = null;
+
+async function takeScreenshot(name) {
+  if (!page) return;
   if (!fs.existsSync(config.screenshotPath)) {
     fs.mkdirSync(config.screenshotPath);
   }
-  await page.screenshot({ path: path.join(config.screenshotPath, `${name}-${Date.now()}.png`) });
+  await page.screenshot({ 
+    path: path.join(config.screenshotPath, `${name}-${Date.now()}.png`),
+    fullPage: true
+  });
 }
 
 async function randomDelay(min=2000, max=5000) {
@@ -48,7 +55,7 @@ async function randomDelay(min=2000, max=5000) {
   });
 
   try {
-    const page = await browser.newPage();
+    page = await browser.newPage();
     
     // Configure browser
     await page.setUserAgent(config.userAgent);
@@ -68,7 +75,7 @@ async function randomDelay(min=2000, max=5000) {
       waitUntil: 'networkidle2',
       timeout: 60000
     });
-    await takeScreenshot(page, 'initial-page');
+    await takeScreenshot('initial-page');
     await randomDelay();
 
     // Apply price filter with retries
@@ -80,11 +87,12 @@ async function randomDelay(min=2000, max=5000) {
         await priceInput.type(config.maxPrice.toString());
         await page.keyboard.press('Enter');
         await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 15000 });
-        await takeScreenshot(page, `post-filter-attempt-${attempt}`);
+        await takeScreenshot(`post-filter-attempt-${attempt}`);
         filterApplied = true;
         break;
       } catch (error) {
         console.log(`Filter attempt ${attempt} failed, retrying...`);
+        await takeScreenshot(`filter-fail-${attempt}`);
         await page.reload({ waitUntil: 'networkidle2' });
         await randomDelay();
       }
@@ -122,7 +130,7 @@ async function randomDelay(min=2000, max=5000) {
 
   } catch (error) {
     fs.writeFileSync('debug.log', `[${new Date().toISOString()}] ERROR: ${error.stack}\n`);
-    await takeScreenshot(page, 'final-error');
+    await takeScreenshot('final-error');
     process.exit(1);
   } finally {
     await browser.close();
