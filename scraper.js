@@ -10,16 +10,16 @@ const BASE_URL = 'https://www.yad2.co.il/vehicles/cars';
 const DELAY = ms => new Promise(res => setTimeout(res, ms));
 
 (async () => {
-  const browser = await puppeteer.launch({
-    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
-    headless: "new",
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-gpu'
-    ]
-  });
+const browser = await puppeteer.launch({
+  executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
+  headless: "new",
+  args: [
+    '--no-sandbox',
+    '--disable-setuid-sandbox',
+    '--disable-dev-shm-usage',
+    '--single-process'  # Added for better resource management
+  ]
+});
 
   try {
     const page = await browser.newPage();
