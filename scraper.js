@@ -68,14 +68,15 @@ const randomDelay = () => delay(config.delays.minAction + Math.random() * config
     let hasNextPage = true;
     while (hasNextPage) {
       try {
-        // Extract listings
+        // Extract listings (FIXED SYNTAX)
         const pageResults = await page.$$eval('.feed_item', items => 
           items.map(item => ({
             title: item.querySelector('.title')?.innerText?.trim() || '',
             price: item.querySelector('.price')?.innerText?.replace(/\D/g, '') || '0',
             year: item.querySelector('.year')?.innerText?.trim() || '',
             link: item.querySelector('a[href]')?.href || ''
-          }));
+          }))
+        );
 
         // Filter and store results
         const validResults = pageResults.filter(car => 
