@@ -54,4 +54,6 @@ jobs:
           name: car-listings
           path: |
             cars.json
+            debug.log
+            page.png
             error.png
