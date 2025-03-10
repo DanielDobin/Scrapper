@@ -19,6 +19,8 @@ jobs:
       - name: Install dependencies
         run: |
           npm install puppeteer puppeteer-extra puppeteer-extra-plugin-stealth
+          # Install chromium explicitly
+          sudo apt-get install -y chromium
 
       - name: Install system libraries
         run: |
@@ -37,11 +39,14 @@ jobs:
             libxdamage1 \
             libxfixes3 \
             libxrandr2 \
+            libxkbcommon0 \  # Added missing dependency
             fonts-liberation \
             xdg-utils
 
       - name: Run scraper
         run: node scraper.js
+        env:
+          PUPPETEER_EXECUTABLE_PATH: "/usr/bin/chromium"  # Point to system Chromium
 
       - name: Upload results
         uses: actions/upload-artifact@v4
