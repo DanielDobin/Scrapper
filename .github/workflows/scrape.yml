@@ -55,5 +55,4 @@ jobs:
           path: |
             cars.json
             debug.log
-            page.png
-            error.png
+            screenshots/
