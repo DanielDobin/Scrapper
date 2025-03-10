@@ -16,16 +16,11 @@ jobs:
         with:
           node-version: 20.x
 
-      - name: Install dependencies
-        run: |
-          npm install puppeteer puppeteer-extra puppeteer-extra-plugin-stealth
-          # Install chromium explicitly
-          sudo apt-get install -y chromium
-
-      - name: Install system libraries
+      - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
+            chromium-browser \  # Correct package name for Ubuntu
             libasound2 \
             libatk-bridge2.0-0 \
             libatk1.0-0 \
@@ -39,14 +34,18 @@ jobs:
             libxdamage1 \
             libxfixes3 \
             libxrandr2 \
-            libxkbcommon0 \  # Added missing dependency
+            libxkbcommon0 \
             fonts-liberation \
             xdg-utils
+
+      - name: Install Node dependencies
+        run: |
+          npm install puppeteer@21.11.0 puppeteer-extra@3.3.6 puppeteer-extra-plugin-stealth@2.11.2
 
       - name: Run scraper
         run: node scraper.js
         env:
-          PUPPETEER_EXECUTABLE_PATH: "/usr/bin/chromium"  # Point to system Chromium
+          PUPPETEER_EXECUTABLE_PATH: "/usr/bin/chromium-browser"  # Updated path
 
       - name: Upload results
         uses: actions/upload-artifact@v4
@@ -54,4 +53,4 @@ jobs:
           name: car-listings
           path: |
             cars.json
-            error.png
+            error.log
