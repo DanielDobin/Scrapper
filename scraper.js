@@ -9,106 +9,69 @@ const config = {
   maxPrice: 10000,
   baseUrl: 'https://www.yad2.co.il/vehicles/cars',
   userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
-  viewport: { width: 1366, height: 768 },
-  delays: {
-    navigation: 3000,
-    minAction: 1500,
-    maxAction: 4500
+  selectors: {
+    listItem: '[data-test-id="feed-item"]', // Updated selector
+    title: '[data-test-id="title"]',
+    price: '[data-test-id="price"]',
+    year: '[data-test-id="year"]',
+    link: 'a[href*="/vehicles/cars/"]', // Updated link pattern
+    priceFilter: 'input[data-test-id="price-to"]' // Updated filter selector
   }
 };
-
-// Helpers
-const delay = ms => new Promise(res => setTimeout(res, ms));
-const randomDelay = () => delay(config.delays.minAction + Math.random() * config.delays.maxAction);
 
 (async () => {
   const browser = await puppeteer.launch({
     executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
     headless: "new",
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--single-process'
-    ]
+    args: ['--no-sandbox', '--disable-setuid-sandbox']
   });
-
-  const results = {
-    cars: [],
-    errors: []
-  };
 
   try {
     const page = await browser.newPage();
     
     // Configure browser
     await page.setUserAgent(config.userAgent);
-    await page.setViewport(config.viewport);
-    await page.setJavaScriptEnabled(true);
+    await page.setViewport({ width: 1366, height: 768 });
+
+    // Debug: Enable console logging
+    page.on('console', msg => console.log('PAGE LOG:', msg.text()));
 
     // Navigate to site
-    await page.goto(config.baseUrl, {
-      waitUntil: 'networkidle2',
-      timeout: 60000
-    });
-    await randomDelay();
+    await page.goto(config.baseUrl, { waitUntil: 'networkidle2', timeout: 60000 });
+    await page.waitForTimeout(2000);
 
     // Apply price filter
-    try {
-      const priceInput = await page.waitForSelector('input[data-test-id="price_max"]', { timeout: 10000 });
-      await priceInput.type(config.maxPrice.toString());
-      await page.keyboard.press('Enter');
-      await page.waitForNavigation({ waitUntil: 'networkidle2' });
-      await randomDelay();
-    } catch (error) {
-      results.errors.push('Price filter failed: ' + error.message);
-    }
+    await page.type(config.selectors.priceFilter, config.maxPrice.toString());
+    await page.keyboard.press('Enter');
+    await page.waitForNavigation({ waitUntil: 'networkidle2' });
+    await page.waitForTimeout(3000);
 
-    // Pagination loop
-    let hasNextPage = true;
-    while (hasNextPage) {
-      try {
-        // Extract listings (FIXED SYNTAX)
-        const pageResults = await page.$$eval('.feed_item', items => 
-          items.map(item => ({
-            title: item.querySelector('.title')?.innerText?.trim() || '',
-            price: item.querySelector('.price')?.innerText?.replace(/\D/g, '') || '0',
-            year: item.querySelector('.year')?.innerText?.trim() || '',
-            link: item.querySelector('a[href]')?.href || ''
-          }))
-        );
+    // Get listings
+    const cars = await page.$$eval(config.selectors.listItem, (items, selectors) => {
+      return items.map(item => ({
+        title: item.querySelector(selectors.title)?.innerText?.trim() || '',
+        price: item.querySelector(selectors.price)?.innerText?.replace(/\D/g, '') || '0',
+        year: item.querySelector(selectors.year)?.innerText?.trim() || '',
+        link: item.querySelector(selectors.link)?.href || ''
+      }));
+    }, config.selectors);
 
-        // Filter and store results
-        const validResults = pageResults.filter(car => 
-          parseInt(car.price) <= config.maxPrice && car.link.startsWith('http')
-        );
-        results.cars.push(...validResults);
+    // Filter results
+    const filtered = cars.filter(car => 
+      parseInt(car.price) <= config.maxPrice && car.link.includes('/vehicles/cars/')
+    );
 
-        // Pagination
-        const nextButton = await page.$('.pagination .next:not(.disabled)');
-        if (!nextButton) {
-          hasNextPage = false;
-          break;
-        }
+    // Save results
+    fs.writeFileSync('cars.json', JSON.stringify(filtered, null, 2));
+    console.log(`Found ${filtered.length} valid listings`);
 
-        await nextButton.click();
-        await page.waitForNavigation({ waitUntil: 'networkidle2' });
-        await randomDelay();
-
-      } catch (error) {
-        results.errors.push(`Page processing failed: ${error.message}`);
-        hasNextPage = false;
-      }
-    }
+    // Debug: Take screenshot
+    await page.screenshot({ path: 'page.png' });
 
   } catch (error) {
-    results.errors.push(`Critical error: ${error.message}`);
-    await page.screenshot({ path: 'error.png' });
+    console.error('Error:', error);
+    fs.writeFileSync('error.log', error.stack);
   } finally {
     await browser.close();
-    
-    // Save results
-    fs.writeFileSync('cars.json', JSON.stringify(results.cars, null, 2));
-    fs.writeFileSync('debug.log', results.errors.join('\n'));
   }
 })();
