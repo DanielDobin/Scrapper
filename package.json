@@ -6,16 +6,9 @@
     "start": "node scraper.js"
   },
   "dependencies": {
-<<<<<<< HEAD
+    "2captcha": "4.0.0",
     "puppeteer": "^21.11.0",
     "puppeteer-extra": "^3.3.6",
-    "puppeteer-extra-plugin-stealth": "^2.11.2",
-    "2captcha": "4.0.0"
-=======
-    "2captcha": "^4.0.0",
-    "puppeteer": "^21.0.0",
-    "puppeteer-extra": "^3.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2"
->>>>>>> 752e9e9 (Fix 2captcha dependency with correct package version)
   }
 }
