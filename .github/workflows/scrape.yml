@@ -7,17 +7,18 @@ jobs:
     env:
       PUPPETEER_EXECUTABLE_PATH: "/usr/bin/chromium-browser"
       CAPTCHA_API_KEY: ${{ secrets.CAPTCHA_API_KEY }}
-      NODE_DEBUG: "2captcha,puppeteer"
-      DEBUG: "true"
 
     steps:
       - uses: actions/checkout@v4
-
+      
+      - name: Clean install
+        run: |
+          rm -rf node_modules package-lock.json
+          
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
-
+          
       - name: Install system dependencies
         run: |
           sudo apt-get update
@@ -36,7 +37,6 @@ jobs:
 
       - name: Run scraper
         run: npm start
-        continue-on-error: true
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -45,4 +45,3 @@ jobs:
           path: |
             cars.json
             error-logs/
-          retention-days: 1
