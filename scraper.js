@@ -1,10 +1,10 @@
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
-const solver = require('2captcha');
+const solver = require('2captcha').Solver;
 const fs = require('fs');
 
 puppeteer.use(StealthPlugin());
-const captchaSolver = new solver.Solver(process.env.CAPTCHA_API_KEY);
+const captcha = new solver(process.env.CAPTCHA_API_KEY);
 
 const config = {
   maxPrice: 10000,
@@ -32,34 +32,35 @@ const config = {
     await page.setViewport({ width: 1366, height: 768 });
 
     // Navigate to page
-    await page.goto(config.baseUrl, { waitUntil: 'networkidle2' });
+    await page.goto(config.baseUrl, { waitUntil: 'networkidle2', timeout: 60000 });
 
-    // Handle CAPTCHA if present
+    // CAPTCHA handling
     if (await page.$(config.selectors.captchaFrame)) {
-      const { data } = await captchaSolver.hcaptcha('ae73173b-7003-44e0-bc87-654d0dab8b75', config.baseUrl);
+      const { data } = await captcha.hcaptcha('ae73173b-7003-44e0-bc87-654d0dab8b75', config.baseUrl);
       await page.$eval(config.selectors.captchaResponse, (el, token) => el.value = token, data);
       await page.click('button[type="submit"]');
-      await page.waitForNavigation();
+      await page.waitForNavigation({ waitUntil: 'networkidle2' });
     }
 
     // Apply price filter
     await page.type(config.selectors.priceFilter, config.maxPrice.toString());
     await page.keyboard.press('Enter');
-    await page.waitForNavigation();
+    await page.waitForNavigation({ waitUntil: 'networkidle2' });
 
     // Scrape results
     const cars = await page.$$eval(config.selectors.listItem, items => 
       items.map(item => ({
-        title: item.querySelector('.title')?.textContent?.trim() || '',
-        price: item.querySelector('.price')?.textContent?.replace(/\D/g, '') || '0',
+        title: item.querySelector('[data-test-id="title"]')?.textContent?.trim() || '',
+        price: item.querySelector('[data-test-id="price"]')?.textContent?.replace(/\D/g, '') || '0',
         link: item.querySelector('a')?.href || ''
-      })).filter(car => parseInt(car.price) <= 10000)
+      })).filter(car => parseInt(car.price) <= config.maxPrice)
     );
 
     fs.writeFileSync('cars.json', JSON.stringify(cars, null, 2));
+    console.log(`Found ${cars.length} valid listings`);
 
   } catch (error) {
-    console.error(error);
+    console.error('Error:', error);
     await page.screenshot({ path: `error-${Date.now()}.png` });
     fs.writeFileSync('error.log', error.stack);
   } finally {
