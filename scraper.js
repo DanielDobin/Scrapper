@@ -1,61 +1,72 @@
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
-const Solver = require('2captcha-api').Solver;
+const { Solver } = require('2captcha');
 const fs = require('fs');
-const util = require('util');
+const path = require('path');
 
-// Create promisified versions of fs methods
-const writeFile = util.promisify(fs.writeFile);
+// Enhanced error logging
+const logError = async (error, page = null) => {
+  const timestamp = Date.now();
+  const errorDir = path.join(__dirname, 'error-logs');
+  
+  try {
+    // Create error directory if not exists
+    if (!fs.existsSync(errorDir)) {
+      fs.mkdirSync(errorDir);
+    }
 
-// Initialize solver with error handling
-let captchaSolver;
-try {
-  captchaSolver = new Solver(process.env.CAPTCHA_API_KEY);
-} catch (error) {
-  console.error('CAPTCHA Solver initialization failed:');
-  console.error(error.stack);
-  process.exit(1);
-}
+    // Write error details
+    const errorData = {
+      timestamp: new Date(timestamp).toISOString(),
+      message: error.message,
+      stack: error.stack,
+      env: {
+        CAPTCHA_KEY: !!process.env.CAPTCHA_API_KEY,
+        PUPPETEER_PATH: process.env.PUPPETEER_EXECUTABLE_PATH
+      }
+    };
+    
+    fs.writeFileSync(
+      path.join(errorDir, `error-${timestamp}.json`),
+      JSON.stringify(errorData, null, 2)
+    );
 
-const config = {
-  maxPrice: 10000,
-  baseUrl: 'https://www.yad2.co.il/vehicles/cars',
-  selectors: {
-    priceFilter: 'input[data-test-id="price-to"]',
-    listItem: 'div[data-test-id="feed-item"]',
-    captchaFrame: 'iframe[src*="hcaptcha"]',
-    captchaResponse: 'textarea[name="h-captcha-response"]'
+    // Capture screenshot if page exists
+    if (page) {
+      await page.screenshot({
+        path: path.join(errorDir, `screenshot-${timestamp}.png`),
+        fullPage: true
+      });
+    }
+  } catch (logError) {
+    console.error('Error logging failed:', logError);
   }
 };
 
 (async () => {
   let browser;
   try {
-    browser = await puppeteer.launch({
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
-      headless: "new",
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-      dumpio: true // Enable verbose logging
-    });
+    // Initialize captcha solver
+    const captchaSolver = new Solver(process.env.CAPTCHA_API_KEY);
+    
+    // Browser setup
+    browser = await puppeteer
+      .use(StealthPlugin())
+      .launch({
+        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
+        headless: "new",
+        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+        dumpio: true // Enable verbose logging
+      });
 
     const page = await browser.newPage();
-    page.on('console', msg => console.log('PAGE LOG:', msg.text()));
-
-    // Rest of your scraping code...
+    
+    // Rest of your scraping logic...
 
   } catch (error) {
-    console.error('MAIN ERROR:');
-    console.error(error.stack);
-    
-    // Write detailed error log
-    await writeFile('full-error.log', 
-      `Error: ${error.message}\n` +
-      `Stack: ${error.stack}\n` +
-      `Environment: ${JSON.stringify(process.env, null, 2)}\n` +
-      `Config: ${JSON.stringify(config, null, 2)}`
-    );
-    
-    process.exitCode = 1;
+    console.error('Unhandled error:', error);
+    await logError(error, browser?.pages()?.[0]);
+    process.exit(1);
   } finally {
     if (browser) await browser.close();
   }
