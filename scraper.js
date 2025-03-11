@@ -1,11 +1,10 @@
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
-const { Solver } = require('2captcha');
-const captcha = new Solver(process.env.CAPTCHA_API_KEY);
+const { Solver } = require('2captcha'); // Fixed import
 const fs = require('fs');
 
 puppeteer.use(StealthPlugin());
-const captcha = new solver(process.env.CAPTCHA_API_KEY);
+const captchaSolver = new Solver(process.env.CAPTCHA_API_KEY); // Renamed variable
 
 const config = {
   maxPrice: 10000,
@@ -28,43 +27,13 @@ const config = {
   const page = await browser.newPage();
   
   try {
-    // Configure browser
-    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36');
-    await page.setViewport({ width: 1366, height: 768 });
-
-    // Navigate to page
-    await page.goto(config.baseUrl, { waitUntil: 'networkidle2', timeout: 60000 });
-
-    // CAPTCHA handling
+    // ... rest of your code stays the same until captcha handling:
+    
     if (await page.$(config.selectors.captchaFrame)) {
-      const { data } = await captcha.hcaptcha('ae73173b-7003-44e0-bc87-654d0dab8b75', config.baseUrl);
+      const { data } = await captchaSolver.hcaptcha('ae73173b-7003-44e0-bc87-654d0dab8b75', config.baseUrl);
       await page.$eval(config.selectors.captchaResponse, (el, token) => el.value = token, data);
       await page.click('button[type="submit"]');
       await page.waitForNavigation({ waitUntil: 'networkidle2' });
     }
-
-    // Apply price filter
-    await page.type(config.selectors.priceFilter, config.maxPrice.toString());
-    await page.keyboard.press('Enter');
-    await page.waitForNavigation({ waitUntil: 'networkidle2' });
-
-    // Scrape results
-    const cars = await page.$$eval(config.selectors.listItem, items => 
-      items.map(item => ({
-        title: item.querySelector('[data-test-id="title"]')?.textContent?.trim() || '',
-        price: item.querySelector('[data-test-id="price"]')?.textContent?.replace(/\D/g, '') || '0',
-        link: item.querySelector('a')?.href || ''
-      })).filter(car => parseInt(car.price) <= config.maxPrice)
-    );
-
-    fs.writeFileSync('cars.json', JSON.stringify(cars, null, 2));
-    console.log(`Found ${cars.length} valid listings`);
-
-  } catch (error) {
-    console.error('Error:', error);
-    await page.screenshot({ path: `error-${Date.now()}.png` });
-    fs.writeFileSync('error.log', error.stack);
-  } finally {
-    await browser.close();
-  }
-})();
+    
+    // ... rest of your original code
