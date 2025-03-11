@@ -6,58 +6,59 @@ const path = require('path');
 puppeteer.use(StealthPlugin({
   automationEvasion: true,
   consoleEvasion: true,
-  userAgentEvasion: true,
-  webglVendor: 'Google Inc. (Intel)',
-  browserName: 'chrome'
+  userAgentEvasion: true
 }));
 
 const config = {
   maxPrice: 10000,
   baseUrl: 'https://www.yad2.co.il/vehicles/cars',
   selectors: {
-    priceFilter: 'input[placeholder="מקסימום"]', // Verified working selector
-    listItem: 'div.feed-item',
-    title: 'div.feed-item-title',
+    priceFilter: 'input[data-test-id="price-to"]',
+    listItem: 'div[data-test-id="feed-item"]',
+    title: 'h2.feed-item-title',
     price: 'div.feed-item-price',
     year: 'div.feed-item-year',
     link: 'a.feed-item-link'
-  },
-  headers: {
-    'Accept-Language': 'he-IL,he;q=0.9',
-    'Referer': 'https://www.yad2.co.il/'
   },
   userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
   screenshotPath: 'screenshots'
 };
 
+let browser = null;
 let page = null;
 
 async function takeScreenshot(name) {
-  if (!page) return;
   try {
+    if (!page || page.isClosed()) return;
+    
     if (!fs.existsSync(config.screenshotPath)) {
       fs.mkdirSync(config.screenshotPath);
     }
-    const filePath = path.join(config.screenshotPath, `${name}-${Date.now()}.png`);
-    await page.screenshot({ path: filePath, fullPage: true });
-    console.log(`Screenshot saved: ${filePath}`);
+    
+    const filename = `${name}-${Date.now()}.png`;
+    await page.screenshot({
+      path: path.join(config.screenshotPath, filename),
+      fullPage: true
+    });
+    console.log(`Saved screenshot: ${filename}`);
   } catch (error) {
-    console.error('Failed to take screenshot:', error);
+    console.error('Screenshot failed:', error);
   }
 }
 
-async function randomDelay(min=2500, max=6000) {
-  const delayTime = Math.floor(Math.random() * (max - min) + min;
+async function randomDelay(min = 2000, max = 5000) {
+  const delayTime = Math.floor(Math.random() * (max - min) + min);
   console.log(`Delaying for ${delayTime}ms`);
   await new Promise(res => setTimeout(res, delayTime));
 }
 
 async function safeReload() {
   try {
+    await takeScreenshot('pre-reload');
     await page.reload({ waitUntil: 'networkidle2', timeout: 15000 });
     await randomDelay();
   } catch (error) {
-    console.log('Reload failed, restarting browser...');
+    console.error('Reload failed, restarting browser...');
     await page.close();
     page = await browser.newPage();
     await initializePage();
@@ -65,7 +66,10 @@ async function safeReload() {
 }
 
 async function initializePage() {
-  await page.setExtraHTTPHeaders(config.headers);
+  await page.setExtraHTTPHeaders({
+    'Accept-Language': 'he-IL,he;q=0.9',
+    'Referer': 'https://www.yad2.co.il/'
+  });
   await page.setUserAgent(config.userAgent);
   await page.setViewport({
     width: 1366 + Math.floor(Math.random() * 100),
@@ -74,24 +78,22 @@ async function initializePage() {
   });
   await page.evaluateOnNewDocument(() => {
     Object.defineProperty(navigator, 'webdriver', { get: () => false });
-    Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3] });
   });
 }
 
 (async () => {
-  const browser = await puppeteer.launch({
-    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
-    headless: "new",
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-blink-features=AutomationControlled',
-      '--lang=he-IL'
-    ]
-  });
-
   try {
+    browser = await puppeteer.launch({
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
+      headless: "new",
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--lang=he-IL'
+      ]
+    });
+
     page = await browser.newPage();
     await initializePage();
 
@@ -102,20 +104,20 @@ async function initializePage() {
     });
     await takeScreenshot('initial-page');
 
-    // Price filter handling
+    // Price filter handling with retries
     let filterApplied = false;
     for (let attempt = 1; attempt <= 5; attempt++) {
       try {
-        await page.waitForSelector(config.selectors.priceFilter, { timeout: 15000 });
-        await page.click(config.selectors.priceFilter, { clickCount: 3 });
-        await page.keyboard.type(config.maxPrice.toString());
+        const priceInput = await page.waitForSelector(config.selectors.priceFilter, { timeout: 15000 });
+        await priceInput.click({ clickCount: 3 });
+        await priceInput.type(config.maxPrice.toString());
         await page.keyboard.press('Enter');
         await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 20000 });
         await takeScreenshot(`post-filter-attempt-${attempt}`);
         filterApplied = true;
         break;
       } catch (error) {
-        console.log(`Filter attempt ${attempt} failed: ${error.message}`);
+        console.error(`Filter attempt ${attempt} failed: ${error.message}`);
         await takeScreenshot(`filter-fail-${attempt}`);
         await safeReload();
       }
@@ -125,34 +127,33 @@ async function initializePage() {
       throw new Error('Price filter application failed after 5 attempts');
     }
 
-    // Listing extraction
+    // Scrape listings
     await page.waitForSelector(config.selectors.listItem, { timeout: 20000 });
-    const cars = await page.$$eval(config.selectors.listItem, (items, cfg) => {
+    const cars = await page.$$eval(config.selectors.listItem, (items, selectors) => {
       return items.map(item => {
         try {
           return {
-            title: item.querySelector(cfg.title)?.textContent?.trim() || '',
-            price: item.querySelector(cfg.price)?.textContent?.replace(/\D/g, '') || '0',
-            year: item.querySelector(cfg.year)?.textContent?.match(/\d+/)?.[0] || '',
-            link: item.querySelector(cfg.link)?.href || ''
+            title: item.querySelector(selectors.title)?.textContent?.trim() || '',
+            price: item.querySelector(selectors.price)?.textContent?.replace(/\D/g, '') || '0',
+            year: item.querySelector(selectors.year)?.textContent?.match(/\d+/)?.[0] || '',
+            link: item.querySelector(selectors.link)?.href || ''
           };
         } catch (error) {
           return null;
         }
-      }).filter(Boolean).filter(car => 
-        parseInt(car.price) <= parseInt(cfg.maxPrice) && 
-        car.link.startsWith('https://')
-    }, { ...config.selectors, maxPrice: config.maxPrice });
+      }).filter(Boolean);
+    }, config.selectors);
 
     // Save results
     fs.writeFileSync('cars.json', JSON.stringify(cars, null, 2));
-    console.log(`Successfully scraped ${cars.length} listings`);
+    console.log(`Successfully found ${cars.length} listings`);
 
   } catch (error) {
-    fs.writeFileSync('debug.log', `[${new Date().toISOString()}] ERROR:\n${error.stack}\n\nPage content:\n${await page?.content()?.catch(() => '')}`);
+    console.error('Critical error:', error);
+    fs.writeFileSync('debug.log', `[${new Date().toISOString()}]\n${error.stack}\n\nPage content:\n${await page?.content()?.catch(() => '')}`);
     await takeScreenshot('final-error');
-    process.exit(1);
   } finally {
-    await browser.close();
+    await takeScreenshot('final-state');
+    if (browser) await browser.close();
   }
 })();
