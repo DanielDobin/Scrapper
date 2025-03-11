@@ -10,12 +10,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-
-      - name: Clean installation
-        run: |
-          rm -rf node_modules
-          rm -f package-lock.json
-
+      
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -24,21 +19,13 @@ jobs:
       - name: Generate package-lock
         run: npm install --package-lock-only
 
-      - name: Install system dependencies
+      - name: Install system deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            chromium-browser \
-            libnss3 \
-            libxcomposite1 \
-            libxrandr2 \
-            libgbm1 \
-            libgtk-3-0 \
-            libasound2 \
-            libatk-bridge2.0-0
+          sudo apt-get install -y chromium-browser
 
-      - name: Install npm packages
-        run: npm ci --no-audit --no-fund
+      - name: Install packages
+        run: npm ci
 
       - name: Run scraper
         run: npm start
@@ -50,4 +37,3 @@ jobs:
           path: |
             cars.json
             error-logs/
-          retention-days: 1
