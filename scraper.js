@@ -4,10 +4,9 @@ const solver = require('2captcha').Solver;
 const fs = require('fs');
 const path = require('path');
 
-// Initialize captcha solver
 const captcha = new solver(process.env.CAPTCHA_API_KEY);
+const errorDir = path.join(__dirname, 'error-logs');
 
-// Configuration
 const config = {
   maxPrice: 10000,
   baseUrl: 'https://www.yad2.co.il/vehicles/cars',
@@ -19,16 +18,14 @@ const config = {
   }
 };
 
-// Error handling
-async function logError(error, page = null) {
-  const timestamp = Date.now();
-  const errorDir = path.join(__dirname, 'error-logs');
-  
-  try {
-    if (!fs.existsSync(errorDir)) {
-      fs.mkdirSync(errorDir, { recursive: true });
-    }
+// Ensure error directory exists
+if (!fs.existsSync(errorDir)) {
+  fs.mkdirSync(errorDir, { recursive: true });
+}
 
+async function logError(error, page) {
+  const timestamp = Date.now();
+  try {
     fs.writeFileSync(
       path.join(errorDir, `error-${timestamp}.json`),
       JSON.stringify({
@@ -37,7 +34,7 @@ async function logError(error, page = null) {
         time: new Date().toISOString()
       }, null, 2)
     );
-
+    
     if (page) {
       await page.screenshot({
         path: path.join(errorDir, `screenshot-${timestamp}.png`),
@@ -45,7 +42,7 @@ async function logError(error, page = null) {
       });
     }
   } catch (logError) {
-    console.error('Failed to log error:', logError);
+    console.error('Failed to save error log:', logError);
   }
 }
 
@@ -64,10 +61,8 @@ async function logError(error, page = null) {
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36');
     await page.setViewport({ width: 1366, height: 768 });
 
-    // Navigation
     await page.goto(config.baseUrl, { waitUntil: 'networkidle2', timeout: 60000 });
 
-    // CAPTCHA handling
     if (await page.$(config.selectors.captchaFrame)) {
       const { data } = await captcha.hcaptcha('ae73173b-7003-44e0-bc87-654d0dab8b75', config.baseUrl);
       await page.$eval(config.selectors.captchaResponse, (el, token) => el.value = token, data);
@@ -75,7 +70,6 @@ async function logError(error, page = null) {
       await page.waitForNavigation({ waitUntil: 'networkidle2' });
     }
 
-    // Filter and scrape
     await page.type(config.selectors.priceFilter, config.maxPrice.toString());
     await page.keyboard.press('Enter');
     await page.waitForNavigation({ waitUntil: 'networkidle2' });
@@ -92,7 +86,7 @@ async function logError(error, page = null) {
     console.log(`Found ${cars.length} valid listings`);
 
   } catch (error) {
-    console.error('Scraping failed:');
+    console.error('Scraping failed:', error.message);
     await logError(error, browser?.pages()?.[0]);
     process.exit(1);
   } finally {
