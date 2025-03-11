@@ -1,6 +1,6 @@
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
-const solver = require('2captcha').Solver;
+const solver = require('2captcha-api');
 const fs = require('fs');
 
 puppeteer.use(StealthPlugin());
