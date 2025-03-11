@@ -7,7 +7,8 @@ jobs:
     env:
       PUPPETEER_EXECUTABLE_PATH: "/usr/bin/chromium-browser"
       CAPTCHA_API_KEY: ${{ secrets.CAPTCHA_API_KEY }}
-      NODE_DEBUG: "2captcha-api,puppeteer"
+      NODE_DEBUG: "2captcha,puppeteer"
+      DEBUG: "*"
 
     steps:
       - uses: actions/checkout@v4
@@ -31,17 +32,24 @@ jobs:
             libatk-bridge2.0-0
 
       - name: Install npm packages
-        run: |
-          npm ci
+        run: npm ci
         continue-on-error: true
 
-      - name: Print npm debug log on failure
-        if: failure()
+      - name: Debug logs
+        if: always()
         run: |
+          echo "--- npm debug log ---"
           cat $(find /home/runner/.npm/_logs -name '*-debug.log' | sort | tail -1)
+          
+          echo "--- Environment ---"
+          printenv
+          
+          echo "--- Installed Packages ---"
+          npm list --depth=0
 
       - name: Run scraper
         run: npm start
+        continue-on-error: true
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -49,5 +57,6 @@ jobs:
           name: results
           path: |
             cars.json
-            *.png
+            error-logs/
             *.log
+          retention-days: 7
