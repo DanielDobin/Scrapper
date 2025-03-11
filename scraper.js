@@ -1,7 +1,7 @@
-import puppeteer from 'puppeteer-extra';
-import StealthPlugin from 'puppeteer-extra-plugin-stealth';
-import { Solver } from '2captcha';
-import fs from 'fs';
+const puppeteer = require('puppeteer-extra');
+const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+const { Solver } = require('2captcha');
+const fs = require('fs');
 
 puppeteer.use(StealthPlugin());
 const captchaSolver = new Solver(process.env.CAPTCHA_API_KEY);
