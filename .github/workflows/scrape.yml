@@ -19,7 +19,7 @@ jobs:
       - name: Generate package-lock
         run: |
           if [ ! -f package-lock.json ]; then
-            npm install --package-lock-only
+            npm install --package-lock-only --no-audit --no-fund
           fi
 
       - name: Install system dependencies
@@ -36,7 +36,7 @@ jobs:
             libatk-bridge2.0-0
 
       - name: Install npm packages
-        run: npm ci
+        run: npm ci --no-audit --no-fund
 
       - name: Run scraper
         run: npm start
