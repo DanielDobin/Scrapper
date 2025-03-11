@@ -1,15 +1,14 @@
 {
   "name": "yad2-scraper",
   "version": "1.0.0",
-  "type": "module",
   "main": "scraper.js",
   "scripts": {
     "start": "node scraper.js"
   },
   "dependencies": {
-    "2captcha": "^5.0.1",
-    "puppeteer": "^22.8.2",
+    "puppeteer": "^21.11.0",
     "puppeteer-extra": "^3.3.6",
-    "puppeteer-extra-plugin-stealth": "^2.11.2"
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
+    "2captcha": "^4.1.0"
   }
 }
