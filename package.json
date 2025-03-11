@@ -1,7 +1,10 @@
 {
   "name": "yad2-scraper",
   "version": "1.0.0",
-  "main": "scraper.js",
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=9.0.0"
+  },
   "dependencies": {
     "puppeteer-extra": "^3.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
