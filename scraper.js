@@ -1,10 +1,21 @@
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
-const { Solver } = require('2captcha');
+const Solver = require('2captcha-api').Solver;
 const fs = require('fs');
+const util = require('util');
 
-puppeteer.use(StealthPlugin());
-const captchaSolver = new Solver(process.env.CAPTCHA_API_KEY);
+// Create promisified versions of fs methods
+const writeFile = util.promisify(fs.writeFile);
+
+// Initialize solver with error handling
+let captchaSolver;
+try {
+  captchaSolver = new Solver(process.env.CAPTCHA_API_KEY);
+} catch (error) {
+  console.error('CAPTCHA Solver initialization failed:');
+  console.error(error.stack);
+  process.exit(1);
+}
 
 const config = {
   maxPrice: 10000,
@@ -18,47 +29,34 @@ const config = {
 };
 
 (async () => {
-  const browser = await puppeteer.launch({
-    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
-    headless: "new",
-    args: ['--no-sandbox', '--disable-setuid-sandbox']
-  });
-
-  const page = await browser.newPage();
-  
+  let browser;
   try {
-    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36');
-    await page.setViewport({ width: 1366, height: 768 });
+    browser = await puppeteer.launch({
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
+      headless: "new",
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      dumpio: true // Enable verbose logging
+    });
 
-    await page.goto(config.baseUrl, { waitUntil: 'networkidle2', timeout: 60000 });
+    const page = await browser.newPage();
+    page.on('console', msg => console.log('PAGE LOG:', msg.text()));
 
-    if (await page.$(config.selectors.captchaFrame)) {
-      const { data } = await captchaSolver.hcaptcha('ae73173b-7003-44e0-bc87-654d0dab8b75', config.baseUrl);
-      await page.$eval(config.selectors.captchaResponse, (el, token) => el.value = token, data);
-      await page.click('button[type="submit"]');
-      await page.waitForNavigation({ waitUntil: 'networkidle2' });
-    }
-
-    await page.type(config.selectors.priceFilter, config.maxPrice.toString());
-    await page.keyboard.press('Enter');
-    await page.waitForNavigation({ waitUntil: 'networkidle2' });
-
-    const cars = await page.$$eval(config.selectors.listItem, items => 
-      items.map(item => ({
-        title: item.querySelector('[data-test-id="title"]')?.textContent?.trim() || '',
-        price: item.querySelector('[data-test-id="price"]')?.textContent?.replace(/\D/g, '') || '0',
-        link: item.querySelector('a')?.href || ''
-      })).filter(car => parseInt(car.price) <= config.maxPrice)
-    );
-
-    fs.writeFileSync('cars.json', JSON.stringify(cars, null, 2));
-    console.log(`Found ${cars.length} valid listings`);
+    // Rest of your scraping code...
 
   } catch (error) {
-    console.error('Error:', error);
-    await page.screenshot({ path: `error-${Date.now()}.png` });
-    fs.writeFileSync('error.log', error.stack);
+    console.error('MAIN ERROR:');
+    console.error(error.stack);
+    
+    // Write detailed error log
+    await writeFile('full-error.log', 
+      `Error: ${error.message}\n` +
+      `Stack: ${error.stack}\n` +
+      `Environment: ${JSON.stringify(process.env, null, 2)}\n` +
+      `Config: ${JSON.stringify(config, null, 2)}`
+    );
+    
+    process.exitCode = 1;
   } finally {
-    await browser.close();
+    if (browser) await browser.close();
   }
 })();
