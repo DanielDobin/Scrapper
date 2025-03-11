@@ -8,7 +8,7 @@ jobs:
       PUPPETEER_EXECUTABLE_PATH: "/usr/bin/chromium-browser"
       CAPTCHA_API_KEY: ${{ secrets.CAPTCHA_API_KEY }}
       NODE_DEBUG: "2captcha,puppeteer"
-      DEBUG: "*"
+      DEBUG: "true"
 
     steps:
       - uses: actions/checkout@v4
@@ -33,19 +33,6 @@ jobs:
 
       - name: Install npm packages
         run: npm ci
-        continue-on-error: true
-
-      - name: Debug logs
-        if: always()
-        run: |
-          echo "--- npm debug log ---"
-          cat $(find /home/runner/.npm/_logs -name '*-debug.log' | sort | tail -1)
-          
-          echo "--- Environment ---"
-          printenv
-          
-          echo "--- Installed Packages ---"
-          npm list --depth=0
 
       - name: Run scraper
         run: npm start
@@ -58,5 +45,4 @@ jobs:
           path: |
             cars.json
             error-logs/
-            *.log
-          retention-days: 7
+          retention-days: 1
