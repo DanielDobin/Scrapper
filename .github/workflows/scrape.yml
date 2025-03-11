@@ -31,10 +31,11 @@ jobs:
 
       - name: Install npm packages
         run: |
-          npm install
+          npm install --package-lock
+          npm ci
 
       - name: Run scraper
-        run: node scraper.js
+        run: npm start
 
       - uses: actions/upload-artifact@v4
         with:
