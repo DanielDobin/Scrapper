@@ -4,12 +4,12 @@
   "main": "scraper.js",
   "scripts": {
     "start": "node scraper.js",
-    "debug": "NODE_DEBUG=2captcha node scraper.js"
+    "debug": "DEBUG=* node scraper.js"
   },
   "dependencies": {
     "puppeteer": "^21.11.0",
     "puppeteer-extra": "^3.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
-    "2captcha-api": "^2.1.0"
+    "2captcha": "^4.0.0"
   }
 }
