@@ -1,8 +1,11 @@
-const puppeteer = require('puppeteer-extra');
-const StealthPlugin = require('puppeteer-extra-plugin-stealth');
-const { Solver } = require('2captcha');
-const fs = require('fs');
-const path = require('path');
+import puppeteer from 'puppeteer-extra';
+import StealthPlugin from 'puppeteer-extra-plugin-stealth';
+import { Solver } from '2captcha';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const config = {
   maxPrice: 10000,
@@ -15,8 +18,8 @@ const config = {
   }
 };
 
-async function handleError(error, page = null) {
-  const errorDir = path.join(__dirname, 'error-logs');
+async function handleError(error, page) {
+  const errorDir = `${__dirname}/error-logs`;
   const timestamp = Date.now();
   
   try {
@@ -25,7 +28,7 @@ async function handleError(error, page = null) {
     }
 
     fs.writeFileSync(
-      path.join(errorDir, `error-${timestamp}.json`),
+      `${errorDir}/error-${timestamp}.json`,
       JSON.stringify({
         message: error.message,
         stack: error.stack,
@@ -35,7 +38,7 @@ async function handleError(error, page = null) {
 
     if (page) {
       await page.screenshot({
-        path: path.join(errorDir, `screenshot-${timestamp}.png`),
+        path: `${errorDir}/screenshot-${timestamp}.png`,
         fullPage: true
       });
     }
@@ -48,7 +51,7 @@ async function handleError(error, page = null) {
   let browser;
   try {
     if (!process.env.CAPTCHA_API_KEY) {
-      throw new Error('Missing CAPTCHA_API_KEY environment variable');
+      throw new Error('CAPTCHA_API_KEY environment variable is missing');
     }
 
     const captchaSolver = new Solver(process.env.CAPTCHA_API_KEY);
