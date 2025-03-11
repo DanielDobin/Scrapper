@@ -1,11 +1,8 @@
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
-const solver = require('2captcha').Solver;
+const { Solver } = require('2captcha');
 const fs = require('fs');
 const path = require('path');
-
-const captcha = new solver(process.env.CAPTCHA_API_KEY);
-const errorDir = path.join(__dirname, 'error-logs');
 
 const config = {
   maxPrice: 10000,
@@ -18,14 +15,15 @@ const config = {
   }
 };
 
-// Ensure error directory exists
-if (!fs.existsSync(errorDir)) {
-  fs.mkdirSync(errorDir, { recursive: true });
-}
-
-async function logError(error, page) {
+async function handleError(error, page = null) {
+  const errorDir = path.join(__dirname, 'error-logs');
   const timestamp = Date.now();
+  
   try {
+    if (!fs.existsSync(errorDir)) {
+      fs.mkdirSync(errorDir, { recursive: true });
+    }
+
     fs.writeFileSync(
       path.join(errorDir, `error-${timestamp}.json`),
       JSON.stringify({
@@ -34,7 +32,7 @@ async function logError(error, page) {
         time: new Date().toISOString()
       }, null, 2)
     );
-    
+
     if (page) {
       await page.screenshot({
         path: path.join(errorDir, `screenshot-${timestamp}.png`),
@@ -49,6 +47,13 @@ async function logError(error, page) {
 (async () => {
   let browser;
   try {
+    // Validate CAPTCHA key
+    if (!process.env.CAPTCHA_API_KEY) {
+      throw new Error('CAPTCHA_API_KEY environment variable is missing');
+    }
+
+    const captchaSolver = new Solver(process.env.CAPTCHA_API_KEY);
+    
     browser = await puppeteer
       .use(StealthPlugin())
       .launch({
@@ -61,15 +66,18 @@ async function logError(error, page) {
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36');
     await page.setViewport({ width: 1366, height: 768 });
 
+    // Navigation
     await page.goto(config.baseUrl, { waitUntil: 'networkidle2', timeout: 60000 });
 
+    // CAPTCHA handling
     if (await page.$(config.selectors.captchaFrame)) {
-      const { data } = await captcha.hcaptcha('ae73173b-7003-44e0-bc87-654d0dab8b75', config.baseUrl);
+      const { data } = await captchaSolver.hcaptcha('ae73173b-7003-44e0-bc87-654d0dab8b75', config.baseUrl);
       await page.$eval(config.selectors.captchaResponse, (el, token) => el.value = token, data);
       await page.click('button[type="submit"]');
       await page.waitForNavigation({ waitUntil: 'networkidle2' });
     }
 
+    // Filter and scrape
     await page.type(config.selectors.priceFilter, config.maxPrice.toString());
     await page.keyboard.press('Enter');
     await page.waitForNavigation({ waitUntil: 'networkidle2' });
@@ -83,11 +91,11 @@ async function logError(error, page) {
     );
 
     fs.writeFileSync('cars.json', JSON.stringify(cars, null, 2));
-    console.log(`Found ${cars.length} valid listings`);
+    console.log(`✅ Found ${cars.length} valid listings`);
 
   } catch (error) {
-    console.error('Scraping failed:', error.message);
-    await logError(error, browser?.pages()?.[0]);
+    console.error('❌ Scraping failed:', error.message);
+    await handleError(error, browser?.pages()?.[0]);
     process.exit(1);
   } finally {
     if (browser) await browser.close();
