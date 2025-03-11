@@ -7,6 +7,7 @@ jobs:
     env:
       PUPPETEER_EXECUTABLE_PATH: "/usr/bin/chromium-browser"
       CAPTCHA_API_KEY: ${{ secrets.CAPTCHA_API_KEY }}
+      PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: "true"
 
     steps:
       - uses: actions/checkout@v4
@@ -30,14 +31,13 @@ jobs:
             libatk-bridge2.0-0
 
       - name: Install npm packages
-        run: |
-          npm install --package-lock
-          npm ci
+        run: npm ci
 
       - name: Run scraper
         run: npm start
 
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: results
           path: |
