@@ -6,9 +6,9 @@
     "start": "node scraper.js"
   },
   "dependencies": {
-    "puppeteer": "^21.0.0",
+    "puppeteer": "^21.11.0",
     "puppeteer-extra": "^3.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
-    "2captcha": "^4.1.0"
+    "2captcha-api": "^2.1.0"
   }
 }
