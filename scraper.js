@@ -40,16 +40,15 @@ async function handleError(error, page = null) {
       });
     }
   } catch (logError) {
-    console.error('Failed to save error log:', logError);
+    console.error('Error logging failed:', logError);
   }
 }
 
 (async () => {
   let browser;
   try {
-    // Validate CAPTCHA key
     if (!process.env.CAPTCHA_API_KEY) {
-      throw new Error('CAPTCHA_API_KEY environment variable is missing');
+      throw new Error('Missing CAPTCHA_API_KEY environment variable');
     }
 
     const captchaSolver = new Solver(process.env.CAPTCHA_API_KEY);
@@ -66,10 +65,8 @@ async function handleError(error, page = null) {
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36');
     await page.setViewport({ width: 1366, height: 768 });
 
-    // Navigation
     await page.goto(config.baseUrl, { waitUntil: 'networkidle2', timeout: 60000 });
 
-    // CAPTCHA handling
     if (await page.$(config.selectors.captchaFrame)) {
       const { data } = await captchaSolver.hcaptcha('ae73173b-7003-44e0-bc87-654d0dab8b75', config.baseUrl);
       await page.$eval(config.selectors.captchaResponse, (el, token) => el.value = token, data);
@@ -77,7 +74,6 @@ async function handleError(error, page = null) {
       await page.waitForNavigation({ waitUntil: 'networkidle2' });
     }
 
-    // Filter and scrape
     await page.type(config.selectors.priceFilter, config.maxPrice.toString());
     await page.keyboard.press('Enter');
     await page.waitForNavigation({ waitUntil: 'networkidle2' });
