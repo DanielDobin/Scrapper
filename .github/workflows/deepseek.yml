@@ -47,6 +47,7 @@ jobs:
         with:
           name: automation-screenshots
           path: |
+            loaded_page.png
             before_login.png
             after_login.png
             error.png
