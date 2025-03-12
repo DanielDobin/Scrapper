@@ -16,18 +16,28 @@ jobs:
           node-version: 20
           cache: 'npm'
 
-      - name: Generate package-lock
+      - name: Clean installation
         run: |
-          if [ ! -f package-lock.json ]; then
-            npm install --package-lock-only
-          fi
+          rm -rf node_modules
+          rm -f package-lock.json
 
-      - name: Install system deps
+      - name: Generate package-lock
+        run: npm install --package-lock-only
+
+      - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y chromium-browser
+          sudo apt-get install -y \
+            chromium-browser \
+            libnss3 \
+            libxcomposite1 \
+            libxrandr2 \
+            libgbm1 \
+            libgtk-3-0 \
+            libasound2 \
+            libatk-bridge2.0-0
 
-      - name: Install packages
+      - name: Install npm packages
         run: npm ci --no-audit
 
       - name: Run scraper
