@@ -16,15 +16,21 @@ jobs:
           node-version: 20
           cache: 'npm'
 
-      - name: Clean install
+      - name: Clean installation
         run: |
           rm -rf node_modules
-          npm ci
+          rm -f package-lock.json
 
       - name: Install Chromium
         run: |
           sudo apt-get update
           sudo apt-get install -y chromium-browser
+
+      - name: Generate package-lock
+        run: npm install --package-lock-only
+
+      - name: Install dependencies
+        run: npm install
 
       - name: Run scraper
         run: npm start
