@@ -1,6 +1,6 @@
 import puppeteer from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
-import { Solver } from '2captcha'; // Verified working import for v4.0.0
+import { Solver } from '2captcha';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
@@ -20,11 +20,15 @@ const config = {
 
 async function handleError(error, page) {
   const errorDir = `${__dirname}/error-logs`;
+  const timestamp = Date.now();
+  
   try {
-    if (!fs.existsSync(errorDir)) fs.mkdirSync(errorDir, { recursive: true });
-    
+    if (!fs.existsSync(errorDir)) {
+      fs.mkdirSync(errorDir, { recursive: true });
+    }
+
     fs.writeFileSync(
-      `${errorDir}/error-${Date.now()}.json`,
+      `${errorDir}/error-${timestamp}.json`,
       JSON.stringify({
         message: error.message,
         stack: error.stack,
@@ -33,10 +37,13 @@ async function handleError(error, page) {
     );
 
     if (page) {
-      await page.screenshot({ path: `${errorDir}/screenshot-${Date.now()}.png` });
+      await page.screenshot({
+        path: `${errorDir}/screenshot-${timestamp}.png`,
+        fullPage: true
+      });
     }
   } catch (logError) {
-    console.error('Failed to log error:', logError);
+    console.error('Error logging failed:', logError);
   }
 }
 
@@ -61,9 +68,8 @@ async function handleError(error, page) {
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36');
     await page.setViewport({ width: 1366, height: 768 });
 
-    // Navigation and CAPTCHA handling
     await page.goto(config.baseUrl, { waitUntil: 'networkidle2', timeout: 60000 });
-    
+
     if (await page.$(config.selectors.captchaFrame)) {
       const { data } = await captchaSolver.hcaptcha('ae73173b-7003-44e0-bc87-654d0dab8b75', config.baseUrl);
       await page.$eval(config.selectors.captchaResponse, (el, token) => el.value = token, data);
@@ -71,7 +77,6 @@ async function handleError(error, page) {
       await page.waitForNavigation({ waitUntil: 'networkidle2' });
     }
 
-    // Data scraping
     await page.type(config.selectors.priceFilter, config.maxPrice.toString());
     await page.keyboard.press('Enter');
     await page.waitForNavigation({ waitUntil: 'networkidle2' });
