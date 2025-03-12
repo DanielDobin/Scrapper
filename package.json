@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "main": "scraper.js",
   "scripts": {
-    "start": "node scraper.js"
+    "start": "node scraper.js",
+    "install": "npm install --package-lock-only"
   },
   "dependencies": {
     "puppeteer": "21.11.0",
