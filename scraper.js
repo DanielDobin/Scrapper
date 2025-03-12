@@ -28,7 +28,7 @@ async function runScraper() {
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36');
     await page.setViewport({ width: 1366, height: 768 });
 
-    // Scraping logic
+    // Navigation
     await page.goto(config.baseUrl, { waitUntil: 'networkidle2', timeout: 60000 });
 
     // CAPTCHA handling
@@ -45,16 +45,17 @@ async function runScraper() {
     await page.keyboard.press('Enter');
     await page.waitForNavigation({ waitUntil: 'networkidle2' });
 
+    // Fixed syntax here
     const cars = await page.$$eval(config.selectors.listItem, items => 
       items.map(item => ({
         title: item.querySelector('[data-test-id="title"]')?.textContent?.trim() || '',
         price: item.querySelector('[data-test-id="price"]')?.textContent?.replace(/\D/g, '') || '0',
         link: item.querySelector('a')?.href || ''
-      })).filter(car => parseInt(car.price) <= config.maxPrice
+      })).filter(car => parseInt(car.price) <= config.maxPrice)
     );
 
     fs.writeFileSync('cars.json', JSON.stringify(cars, null, 2));
-    console.log(`✅ Found ${cars.length} listings`);
+    console.log(`✅ Found ${cars.length} valid listings`);
 
   } catch (error) {
     console.error('❌ Error:', error.message);
