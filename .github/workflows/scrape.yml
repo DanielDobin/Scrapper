@@ -1,4 +1,3 @@
-# .github/workflows/scrape.yml
 name: Yad2 Scraper
 on: workflow_dispatch
 
