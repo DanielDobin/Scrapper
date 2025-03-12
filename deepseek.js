@@ -1,23 +1,45 @@
-import puppeteer from 'puppeteer';
+import puppeteer from 'puppeteer-extra';
+import StealthPlugin from 'puppeteer-extra-plugin-stealth';
+import { executablePath } from 'puppeteer';
+
+// Add stealth plugin to avoid detection
+puppeteer.use(StealthPlugin());
 
 (async () => {
   const browser = await puppeteer.launch({
     headless: "new",
-    args: ['--no-sandbox', '--disable-setuid-sandbox']
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-web-security',
+      '--disable-features=IsolateOrigins,site-per-process'
+    ],
+    executablePath: executablePath()
   });
 
-  let page; // Declare page variable outside the try block
-
+  let page;
   try {
     page = await browser.newPage();
-    
+
+    // Set a realistic user agent
+    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+
     // Navigate to Deepseek login page
-    await page.goto('https://chat.deepseek.com/sign_in', { waitUntil: 'networkidle2' });
-    console.log('Loaded Deepseek login page');
+    await page.goto('https://chat.deepseek.com/sign_in', {
+      waitUntil: 'networkidle2',
+      timeout: 60000 // Increased timeout to handle Cloudflare
+    });
 
     // Take a screenshot of the page when loaded
     await page.screenshot({ path: 'loaded_page.png' });
     console.log('Screenshot saved: loaded_page.png');
+
+    // Check if Cloudflare challenge is present
+    const isCloudflare = await page.$('text/Verify you are human');
+    if (isCloudflare) {
+      throw new Error('Cloudflare challenge detected. Manual intervention required.');
+    }
 
     // Wait for the email input field to be visible
     await page.waitForSelector('input[placeholder="Phone number/email address"]', { visible: true, timeout: 10000 });
@@ -62,7 +84,7 @@ import puppeteer from 'puppeteer';
       await page.screenshot({ path: 'error.png' });
       console.log('Screenshot saved: error.png');
     }
-    
+
     process.exit(1);
   } finally {
     await browser.close();
