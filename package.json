@@ -2,20 +2,13 @@
   "name": "yad2-scraper",
   "version": "1.0.0",
   "type": "module",
-  "main": "scraper.js",
   "scripts": {
-    "start": "node scraper.js",
-    "lint": "eslint ."
+    "start": "node scraper.js"
   },
   "dependencies": {
-    "2captcha": "4.0.0",
-    "puppeteer": "22.8.2",
-    "puppeteer-extra": "3.3.6",
-    "puppeteer-extra-plugin-stealth": "2.11.2"
-  },
-  "devDependencies": {
-    "eslint": "8.56.0",
-    "eslint-config-airbnb-base": "15.0.0",
-    "eslint-plugin-import": "2.29.0"
+    "2captcha": "^4.0.0",
+    "puppeteer": "^22.8.2",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2"
   }
 }
