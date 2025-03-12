@@ -2,90 +2,72 @@ import puppeteer from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import { executablePath } from 'puppeteer';
 
-// Add stealth plugin to avoid detection
 puppeteer.use(StealthPlugin());
 
 (async () => {
   const browser = await puppeteer.launch({
     headless: "new",
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-web-security',
-      '--disable-features=IsolateOrigins,site-per-process'
-    ],
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
     executablePath: executablePath()
   });
 
   let page;
   try {
     page = await browser.newPage();
-
-    // Set a realistic user agent
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
 
-    // Navigate to Deepseek login page
+    // Navigate to page
     await page.goto('https://chat.deepseek.com/sign_in', {
       waitUntil: 'networkidle2',
-      timeout: 60000 // Increased timeout to handle Cloudflare
+      timeout: 60000
     });
 
-    // Take a screenshot of the page when loaded
-    await page.screenshot({ path: 'loaded_page.png' });
-    console.log('Screenshot saved: loaded_page.png');
-
-    // Check if Cloudflare challenge is present
-    const isCloudflare = await page.$('text/Verify you are human');
-    if (isCloudflare) {
-      throw new Error('Cloudflare challenge detected. Manual intervention required.');
+    // Handle cookie consent
+    try {
+      await page.waitForSelector('input[type="checkbox"]', { visible: true, timeout: 5000 });
+      await page.click('input[type="checkbox"][aria-label="Necessary cookies only"]');
+      console.log('Clicked necessary cookies checkbox');
+      
+      // Wait for cookie settings to apply
+      await page.waitForTimeout(2000);
+      
+      // Look for confirmation button if exists
+      const confirmButton = await page.$('button:has-text("Confirm")');
+      if (confirmButton) {
+        await confirmButton.click();
+        console.log('Clicked cookie confirmation button');
+      }
+    } catch (cookieError) {
+      console.log('No cookie consent screen found');
     }
 
-    // Wait for the email input field to be visible
-    await page.waitForSelector('input[placeholder="Phone number/email address"]', { visible: true, timeout: 10000 });
-    console.log('Email input field found');
+    // Take initial screenshot
+    await page.screenshot({ path: 'loaded_page.png' });
 
-    // Fill email
-    await page.type('input[placeholder="Phone number/email address"]', 'alon123tt@gmail.com');
-    console.log('Filled email');
-
-    // Fill password
-    await page.type('input[type="password"]', '12345678');
-    console.log('Filled password');
-
-    // Click the "I confirm" checkbox
-    await page.click('input[type="checkbox"]');
-    console.log('Clicked "I confirm" checkbox');
-
-    // Take a screenshot before login
+    // Fill login form
+    await page.waitForSelector('input[data-testid="login-email-input"]', { visible: true, timeout: 10000 });
+    await page.type('input[data-testid="login-email-input"]', 'alon123tt@gmail.com');
+    await page.type('input[data-testid="login-password-input"]', '12345678');
+    
+    // Handle confirmation checkbox
+    await page.click('input[name="terms"]');
+    
+    // Pre-login screenshot
     await page.screenshot({ path: 'before_login.png' });
-    console.log('Screenshot saved: before_login.png');
 
-    // Submit login form
+    // Submit login
     await Promise.all([
-      page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 15000 }), // Increased timeout
-      page.click('button:has-text("Log in")')
+      page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 15000 }),
+      page.click('button[data-testid="login-submit-button"]')
     ]);
-    console.log('Submitted login form');
 
-    // Wait for 5 seconds after login
+    // Post-login actions
     await page.waitForTimeout(5000);
-    console.log('Waited 5 seconds after login');
-
-    // Take a screenshot after login
     await page.screenshot({ path: 'after_login.png' });
-    console.log('Screenshot saved: after_login.png');
 
   } catch (error) {
     console.error('Error:', error.message);
-
-    // Take screenshot for debugging (if page is defined)
-    if (page) {
-      await page.screenshot({ path: 'error.png' });
-      console.log('Screenshot saved: error.png');
-    }
-
-    process.exit(1);
+    if (page) await page.screenshot({ path: 'error.png' });
   } finally {
     await browser.close();
   }
