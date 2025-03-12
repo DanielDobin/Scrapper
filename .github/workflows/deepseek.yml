@@ -6,7 +6,7 @@ on:
 jobs:
   run-automation:
     runs-on: ubuntu-22.04
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       
@@ -23,9 +23,13 @@ jobs:
             libxshmfence1 \
             libasound2 \
             libnss3 \
-            libatk-bridge2.0-0
+            libatk-bridge2.0-0 \
+            libdrm2
 
-          npm install --legacy-peer-deps puppeteer@22.11.0 puppeteer-extra@3.3.6
+          npm install --legacy-peer-deps \
+            puppeteer@22.11.0 \
+            puppeteer-extra@3.3.6 \
+            puppeteer-extra-plugin-stealth@2.11.2
 
       - name: Run Automation
         run: |
