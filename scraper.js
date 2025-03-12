@@ -15,109 +15,61 @@ const config = {
   maxPrice: 10000,
   baseUrl: 'https://www.yad2.co.il/vehicles/cars',
   selectors: {
-    priceFilter: 'input[data-test-id="price-to"], input[name="price_to"]',
+    priceFilter: [
+      'input[data-test-id="price-to"]',
+      'input[name="price_to"]',
+      'input[aria-label="מחיר עד"]',
+      '#price_to'
+    ].join(','),
     listItem: '[data-test-id="feed-item"]',
     captchaFrame: 'iframe[src*="hcaptcha"]',
     captchaCheckbox: '.hcaptcha-box',
     captchaResponse: 'textarea[name="h-captcha-response"]',
     submitButton: 'button[type="submit"]',
-    mainContent: '#feed_content, #main_layout, main',
-    bodyContent: 'body'
+    mainContent: '#feed_content, #main_layout, main'
   },
   delays: {
-    navigation: 120000,  // 2 minutes
+    navigation: 120000,
     action: 30000
   },
   headless: true,
   userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
 };
 
-async function captureScreenshot(page, stepName) {
-  const path = `${__dirname}/screenshots/${Date.now()}-${stepName}.png`;
-  await page.screenshot({ path, fullPage: true });
-  return path;
-}
+// ... (keep previous captureScreenshot and handleError functions)
 
-async function handleError(error, page, stepName) {
-  const errorData = {
-    message: error.message,
-    stack: error.stack,
-    time: new Date().toISOString(),
-    step: stepName,
-    screenshot: page ? await captureScreenshot(page, `error-${stepName}`) : null,
-    html: page ? await page.content() : null,
-    url: page ? await page.url() : null
-  };
-  fs.writeFileSync(`${__dirname}/error-logs/error-${Date.now()}.json`, JSON.stringify(errorData, null, 2));
-}
+async function setPriceFilter(page) {
+  console.log('🔧 Setting price filter');
+  await captureScreenshot(page, 'before-price-filter');
+  
+  // Wait for price input with multiple fallbacks
+  const priceInput = await page.waitForSelector(config.selectors.priceFilter, {
+    visible: true,
+    timeout: config.delays.action
+  }).catch(() => {
+    throw new Error(`Price filter not found. Tried: ${config.selectors.priceFilter}`);
+  });
 
-async function safeNavigation(page, url) {
-  console.log(`🌐 Navigating to: ${url}`);
-  const response = await page.goto(url, {
+  await priceInput.click({ clickCount: 3 });
+  await priceInput.type(config.maxPrice.toString());
+  await priceInput.press('Enter');
+  
+  await page.waitForNavigation({ 
     waitUntil: 'domcontentloaded',
-    timeout: config.delays.navigation
+    timeout: config.delays.navigation 
   });
-
-  if (!response.ok()) {
-    throw new Error(`Navigation failed: ${response.status()} ${response.statusText()}`);
-  }
-
-  console.log('✅ Page loaded successfully');
-  console.log('Final URL:', page.url());
-  console.log('Page title:', await page.title());
   
-  await captureScreenshot(page, 'loaded-page');
+  await captureScreenshot(page, 'after-price-filter');
 }
 
-async function solveCaptcha(page) {
-  const solver = new Solver(process.env.CAPTCHA_API_KEY);
-  const { data: token } = await solver.hcaptcha(
-    'ae73173b-7003-44e0-bc87-654d0dab8b75',
-    page.url()
-  );
-  await page.evaluate((t) => {
-    document.querySelector('textarea[name="h-captcha-response"]').value = t;
-  }, token);
-  await page.click(config.selectors.submitButton);
-}
-
-async function initializeBrowser() {
-  const browser = await puppeteer
-    .use(StealthPlugin())
-    .launch({
-      headless: config.headless,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-web-security',
-        '--window-size=1366,768'
-      ],
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH
-    });
-
-  const page = await browser.newPage();
-  await page.setUserAgent(config.userAgent);
-  await page.setViewport({ width: 1366, height: 768 });
-  
-  await page.setRequestInterception(true);
-  page.on('request', (req) => {
-    req.resourceType() === 'image' ? req.abort() : req.continue();
-  });
-
-  return { browser, page };
-}
-
-(async () => {
+async function mainFlow() {
   let browser;
   try {
     const { browser: b, page } = await initializeBrowser();
     browser = b;
 
-    // Step 1: Force navigation
     await safeNavigation(page, config.baseUrl);
-
-    // Step 2: Handle CAPTCHA
+    
     if (await page.$(config.selectors.captchaFrame)) {
       console.log('🔍 CAPTCHA detected');
       await solveCaptcha(page);
@@ -125,15 +77,8 @@ async function initializeBrowser() {
       await captureScreenshot(page, 'after-captcha');
     }
 
-    // Step 3: Set price filter
-    console.log('🔧 Setting price filter');
-    const priceInput = await page.$(config.selectors.priceFilter);
-    await priceInput.click({ clickCount: 3 });
-    await priceInput.type(config.maxPrice.toString());
-    await priceInput.press('Enter');
-    await page.waitForNavigation({ timeout: config.delays.navigation });
+    await setPriceFilter(page);
     
-    // Step 4: Extract data
     console.log('📦 Extracting listings');
     const listings = await page.$$eval(config.selectors.listItem, items => 
       items.map(item => ({
@@ -148,8 +93,11 @@ async function initializeBrowser() {
 
   } catch (error) {
     console.error('💀 Critical failure:', error.message);
-    process.exit(1);
+    process.exitCode = 1; // Set exit code but don't throw
   } finally {
     await browser?.close();
   }
-})();
+}
+
+// Start the process
+mainFlow();
