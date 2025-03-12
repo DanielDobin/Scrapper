@@ -4,7 +4,8 @@
   "type": "module",
   "main": "scraper.js",
   "scripts": {
-    "start": "node scraper.js"
+    "start": "node scraper.js",
+    "prepare": "npm install --package-lock-only --no-audit"
   },
   "dependencies": {
     "puppeteer": "^22.8.2",
