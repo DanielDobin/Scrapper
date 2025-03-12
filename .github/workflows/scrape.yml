@@ -6,8 +6,8 @@ jobs:
     runs-on: ubuntu-22.04
     env:
       CAPTCHA_API_KEY: ${{ secrets.CAPTCHA_API_KEY }}
-      PUPPETEER_EXECUTABLE_PATH: '/usr/bin/google-chrome'
-      
+      PUPPETEER_EXECUTABLE_PATH: '/usr/bin/google-chrome-stable'
+
     steps:
       - uses: actions/checkout@v4
       
@@ -15,6 +15,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y google-chrome-stable
+          sudo rm -f /usr/bin/chromium  # Remove existing link if present
           sudo ln -s /usr/bin/google-chrome-stable /usr/bin/chromium
 
       - uses: actions/setup-node@v4
