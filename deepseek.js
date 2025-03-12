@@ -6,12 +6,22 @@ import puppeteer from 'puppeteer';
     args: ['--no-sandbox', '--disable-setuid-sandbox']
   });
 
+  let page; // Declare page variable outside the try block
+
   try {
-    const page = await browser.newPage();
+    page = await browser.newPage();
     
     // Navigate to Deepseek login page
     await page.goto('https://chat.deepseek.com/sign_in', { waitUntil: 'networkidle2' });
     console.log('Loaded Deepseek login page');
+
+    // Take a screenshot of the page when loaded
+    await page.screenshot({ path: 'loaded_page.png' });
+    console.log('Screenshot saved: loaded_page.png');
+
+    // Wait for the email input field to be visible
+    await page.waitForSelector('input[name="email"]', { visible: true, timeout: 10000 });
+    console.log('Email input field found');
 
     // Fill email
     await page.type('input[name="email"]', 'alon123tt@gmail.com');
@@ -46,10 +56,12 @@ import puppeteer from 'puppeteer';
 
   } catch (error) {
     console.error('Error:', error.message);
-    
-    // Take screenshot for debugging
-    await page.screenshot({ path: 'error.png' });
-    console.log('Screenshot saved: error.png');
+
+    // Take screenshot for debugging (if page is defined)
+    if (page) {
+      await page.screenshot({ path: 'error.png' });
+      console.log('Screenshot saved: error.png');
+    }
     
     process.exit(1);
   } finally {
