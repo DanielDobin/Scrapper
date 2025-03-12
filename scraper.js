@@ -1,6 +1,6 @@
 import puppeteer from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
-import Solver from '2captcha';
+import { Solver } from '2captcha'; // Verified working import for v4.0.0
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
