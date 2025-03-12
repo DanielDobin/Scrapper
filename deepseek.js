@@ -20,11 +20,11 @@ import puppeteer from 'puppeteer';
     console.log('Screenshot saved: loaded_page.png');
 
     // Wait for the email input field to be visible
-    await page.waitForSelector('input[type="text"]', { visible: true, timeout: 10000 });
+    await page.waitForSelector('input[placeholder="Phone number/email address"]', { visible: true, timeout: 10000 });
     console.log('Email input field found');
 
     // Fill email
-    await page.type('input[type="text"]', 'alon123tt@gmail.com');
+    await page.type('input[placeholder="Phone number/email address"]', 'alon123tt@gmail.com');
     console.log('Filled email');
 
     // Fill password
@@ -42,7 +42,7 @@ import puppeteer from 'puppeteer';
     // Submit login form
     await Promise.all([
       page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 15000 }), // Increased timeout
-      page.click('button[type="submit"]')
+      page.click('button:has-text("Log in")')
     ]);
     console.log('Submitted login form');
 
