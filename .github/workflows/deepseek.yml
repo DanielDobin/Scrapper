@@ -6,7 +6,7 @@ on:
 jobs:
   run-automation:
     runs-on: ubuntu-22.04
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       
@@ -23,7 +23,8 @@ jobs:
             libxshmfence1 \
             libasound2 \
             libnss3 \
-            libatk-bridge2.0-0
+            libatk-bridge2.0-0 \
+            xvfb
 
           npm install --legacy-peer-deps \
             puppeteer@22.11.0 \
@@ -37,5 +38,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: results
-          path: '*.png'
+          name: debug-data
+          path: |
+            *.png
+            debug.log
