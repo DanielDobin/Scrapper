@@ -7,44 +7,29 @@ jobs:
     env:
       CAPTCHA_API_KEY: ${{ secrets.CAPTCHA_API_KEY }}
       PUPPETEER_EXECUTABLE_PATH: '/usr/bin/google-chrome'
-
+      
     steps:
       - uses: actions/checkout@v4
+      
+      - name: Setup Chrome
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y google-chrome-stable
+          sudo ln -s /usr/bin/google-chrome-stable /usr/bin/chromium
 
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: 'npm'
 
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            google-chrome-stable \
-            libnss3 \
-            libxcomposite1 \
-            libxrandr2 \
-            libgbm1 \
-            libgtk-3-0 \
-            libasound2 \
-            libatk-bridge2.0-0
-
-      - name: Install npm packages
-        run: |
-          npm ci --no-audit --legacy-peer-deps
-          npm rebuild
-
-      - name: Run scraper
-        timeout-minutes: 15
-        run: npm start
-
+      - run: npm ci --no-audit
+      
+      - run: npm start
+      
       - uses: actions/upload-artifact@v4
-        if: always()
         with:
           name: results
           path: |
             cars.json
-            error.log
-            error-logs/
             screenshots/
-          retention-days: 1
+            error-*.json
