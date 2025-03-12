@@ -6,6 +6,7 @@ on:
 jobs:
   run-automation:
     runs-on: ubuntu-22.04
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -13,15 +14,23 @@ jobs:
           node-version: 20.x
           cache: 'npm'
           
-      - name: Install Essentials
+      - name: Install Critical Dependencies
         run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgbm-dev \
+            libxshmfence-dev \
+            libasound2 \
+            libnss3 \
+            libatk-bridge2.0-0
+          
           npm install puppeteer@22.11.0 puppeteer-extra@3.3.6
-          sudo apt-get install -y libgbm-dev
 
       - name: Run Automation
-        run: node deepseek.js || true
+        run: |
+          xvfb-run --auto-servernum node deepseek.js || true
 
       - uses: actions/upload-artifact@v4
         with:
-          name: results
+          name: debug-screens
           path: '*.png'
