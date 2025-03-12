@@ -1,3 +1,4 @@
+# .github/workflows/scrape.yml
 name: Yad2 Scraper
 on: workflow_dispatch
 
@@ -5,7 +6,6 @@ jobs:
   scrape:
     runs-on: ubuntu-22.04
     env:
-      PUPPETEER_EXECUTABLE_PATH: "/usr/bin/chromium-browser"
       CAPTCHA_API_KEY: ${{ secrets.CAPTCHA_API_KEY }}
 
     steps:
@@ -16,19 +16,10 @@ jobs:
           node-version: 20
           cache: 'npm'
 
-      - name: Clean installation
-        run: |
-          rm -rf node_modules
-          rm -f package-lock.json
-
-      - name: Generate package-lock
-        run: npm install --package-lock-only
-
       - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            chromium-browser \
             libnss3 \
             libxcomposite1 \
             libxrandr2 \
@@ -41,6 +32,7 @@ jobs:
         run: npm ci --no-audit
 
       - name: Run scraper
+        timeout-minutes: 10
         run: npm start
 
       - uses: actions/upload-artifact@v4
