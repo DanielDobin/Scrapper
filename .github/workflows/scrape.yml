@@ -15,7 +15,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y google-chrome-stable
-          sudo rm -f /usr/bin/chromium
+          sudo rm -f /usr/bin/chromium || true
           sudo ln -s /usr/bin/google-chrome-stable /usr/bin/chromium
 
       - uses: actions/setup-node@v4
@@ -25,7 +25,7 @@ jobs:
 
       - run: npm ci --no-audit
       
-      - run: npm start
+      - run: npm start || true
       
       - uses: actions/upload-artifact@v4
         with:
@@ -34,3 +34,4 @@ jobs:
             cars.json
             screenshots/
             error-logs/
+          retention-days: 1
