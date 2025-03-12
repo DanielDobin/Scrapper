@@ -23,13 +23,13 @@ jobs:
             libxshmfence1 \
             libasound2 \
             libnss3 \
-            libatk-bridge2.0-0 \
-            libdrm2
+            libatk-bridge2.0-0
 
           npm install --legacy-peer-deps \
             puppeteer@22.11.0 \
             puppeteer-extra@3.3.6 \
-            puppeteer-extra-plugin-stealth@2.11.2
+            puppeteer-extra-plugin-stealth@2.11.2 \
+            2captcha
 
       - name: Run Automation
         run: |
@@ -37,5 +37,5 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: debug-data
+          name: results
           path: '*.png'
