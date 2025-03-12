@@ -4,6 +4,15 @@ import { executablePath } from 'puppeteer';
 
 puppeteer.use(StealthPlugin());
 
+// Configure human-like behavior
+const humanType = async (page, selector, text) => {
+  await page.focus(selector);
+  for (const char of text) {
+    await page.keyboard.type(char, { delay: 50 + Math.random() * 50 });
+    await page.waitForTimeout(50 + Math.random() * 100);
+  }
+};
+
 (async () => {
   const browser = await puppeteer.launch({
     headless: "new",
@@ -11,6 +20,7 @@ puppeteer.use(StealthPlugin());
       '--no-sandbox',
       '--disable-setuid-sandbox',
       '--disable-dev-shm-usage',
+      '--disable-web-security',
       '--window-size=1920,1080'
     ],
     executablePath: executablePath()
@@ -19,10 +29,18 @@ puppeteer.use(StealthPlugin());
   const page = await browser.newPage();
   
   try {
-    // Set realistic browser fingerprint
+    // Configure advanced browser fingerprint
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36');
     await page.setExtraHTTPHeaders({
-      'Accept-Language': 'en-US,en;q=0.9'
+      'Accept-Language': 'en-US,en;q=0.9',
+      'Sec-CH-UA': '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"'
+    });
+    await page.evaluateOnNewDocument(() => {
+      delete navigator.webdriver;
+      Object.defineProperty(navigator, 'plugins', {
+        get: () => [1, 2, 3],
+        configurable: true
+      });
     });
 
     // Navigate with Cloudflare handling
@@ -31,62 +49,64 @@ puppeteer.use(StealthPlugin());
       timeout: 60000
     });
 
-    // Cloudflare Challenge Solution v3
+    // Cloudflare Challenge Handling v4
+    let cloudflareSolved = false;
     try {
-      // Wait for challenge iframe
-      const cfFrame = await page.waitForSelector('iframe[src*="challenges.cloudflare.com"]', {
-        visible: true,
-        timeout: 15000
-      });
-      
-      // Switch to iframe context
-      const frame = await cfFrame.contentFrame();
-      console.log('Switched to Cloudflare iframe');
-
-      // Click checkbox using multiple selector strategies
-      await frame.waitForSelector('#cf-challenge-checkbox, .hcaptcha-box', {
-        visible: true,
-        timeout: 10000
+      // Alternative detection methods
+      const challengeDetected = await page.evaluate(() => {
+        return document.querySelector('#challenge-form') || 
+               document.body.textContent.includes('Verify you are human');
       });
 
-      // Simulate human click with coordinates
-      const checkbox = await frame.$('#cf-challenge-checkbox, .hcaptcha-box');
-      const rect = await checkbox.boundingBox();
-      
-      await page.mouse.click(
-        rect.x + rect.width / 2 + Math.random() * 5,
-        rect.y + rect.height / 2 + Math.random() * 5,
-        { delay: 100 + Math.random() * 100 }
-      );
+      if (challengeDetected) {
+        console.log('Cloudflare challenge detected');
+        await page.screenshot({ path: 'cloudflare-challenge.png' });
 
-      console.log('Cloudflare checkbox clicked');
-      
-      // Wait for challenge completion
-      await page.waitForFunction(
-        () => !document.querySelector('iframe[src*="challenges.cloudflare.com"]'),
-        { timeout: 20000 }
-      );
-      console.log('Cloudflare verification confirmed');
+        // Multiple interaction strategies
+        await page.waitForFunction(() => {
+          const iframe = document.querySelector('iframe[src*="challenge"], iframe[src*="cloudflare"]');
+          return iframe && iframe.offsetParent !== null;
+        }, { timeout: 20000 });
 
+        // Execute in iframe context
+        const frame = await page.frames().find(f => f.url().includes('challenges.cloudflare.com'));
+        if (frame) {
+          await frame.waitForSelector('.mark, #cf-challenge-checkbox', { visible: true, timeout: 15000 });
+          const box = await frame.$('.mark, #cf-challenge-checkbox');
+          await box.click();
+          console.log('Cloudflare checkbox clicked');
+          
+          // Verify challenge completion
+          await page.waitForFunction(
+            () => !document.querySelector('#challenge-form'),
+            { timeout: 25000 }
+          );
+          cloudflareSolved = true;
+        }
+      }
     } catch (cfError) {
-      console.log('Cloudflare handling failed:', cfError.message);
+      console.log('Cloudflare handling error:', cfError.message);
       await page.screenshot({ path: 'cloudflare-error.png' });
-      throw cfError;
     }
 
-    // Proceed with login
-    await page.waitForSelector('input[name="email"]', {
-      visible: true,
-      timeout: 10000
-    });
+    // Post-Challenge Verification
+    if (!cloudflareSolved) {
+      console.log('Proceeding without Cloudflare verification');
+      await page.screenshot({ path: 'no-cloudflare.png' });
+    }
 
     // Login sequence
-    await page.type('input[name="email"]', 'alon123tt@gmail.com', { delay: 50 });
-    await page.type('input[name="password"]', '12345678', { delay: 50 });
+    await page.waitForSelector('input[name="email"]', { 
+      visible: true,
+      timeout: 20000,
+      handleError: true
+    });
+    
+    await humanType(page, 'input[name="email"]', 'alon123tt@gmail.com');
+    await humanType(page, 'input[name="password"]', '12345678');
     await page.click('input[type="checkbox"]');
     await page.click('button[type="submit"]');
     
-    // Final verification
     await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 15000 });
     await page.screenshot({ path: 'success.png' });
 
