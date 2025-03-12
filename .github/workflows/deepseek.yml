@@ -6,7 +6,7 @@ on:
 jobs:
   run-automation:
     runs-on: ubuntu-22.04
-    timeout-minutes: 30
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
       
@@ -24,6 +24,7 @@ jobs:
             libasound2 \
             libnss3 \
             libatk-bridge2.0-0 \
+            libdrm2 \
             xvfb
 
           npm install --legacy-peer-deps \
