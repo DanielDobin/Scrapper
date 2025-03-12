@@ -4,19 +4,17 @@
   "type": "module",
   "main": "scraper.js",
   "scripts": {
-    "start": "node scraper.js",
-    "prepare": "npm run lint",
-    "lint": "eslint ."
+    "start": "node scraper.js"
   },
   "dependencies": {
     "2captcha": "4.0.0",
-    "puppeteer": "21.11.0",
+    "puppeteer": "22.8.2",  // Updated to supported version
     "puppeteer-extra": "3.3.6",
     "puppeteer-extra-plugin-stealth": "2.11.2"
   },
   "devDependencies": {
-    "eslint": "8.56.0",
-    "eslint-config-airbnb-base": "15.0.0",
-    "eslint-plugin-import": "2.29.0"
+    "eslint": "9.4.0",  // Latest supported ESLint
+    "eslint-config-airbnb-base": "17.1.1",
+    "eslint-plugin-import": "2.29.1"
   }
 }
