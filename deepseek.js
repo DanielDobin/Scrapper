@@ -1,70 +1,53 @@
-import puppeteer from 'puppeteer';
+name: Deepseek Automation
 
-(async () => {
-  const browser = await puppeteer.launch({
-    headless: "new",
-    args: ['--no-sandbox', '--disable-setuid-sandbox']
-  });
+on:
+  workflow_dispatch:
 
-  let page; // Declare page variable outside the try block
+jobs:
+  run-automation:
+    runs-on: ubuntu-22.04
 
-  try {
-    page = await browser.newPage();
-    
-    // Navigate to Deepseek login page
-    await page.goto('https://chat.deepseek.com/sign_in', { waitUntil: 'networkidle2' });
-    console.log('Loaded Deepseek login page');
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    // Take a screenshot of the page when loaded
-    await page.screenshot({ path: 'loaded_page.png' });
-    console.log('Screenshot saved: loaded_page.png');
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
 
-    // Wait for the email input field to be visible
-    await page.waitForSelector('input[placeholder="Phone number/email address"]', { visible: true, timeout: 10000 });
-    console.log('Email input field found');
+      - name: Install Puppeteer
+        run: npm install puppeteer@latest
 
-    // Fill email
-    await page.type('input[placeholder="Phone number/email address"]', 'alon123tt@gmail.com');
-    console.log('Filled email');
+      - name: Install System Libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libasound2 \
+            libatk-bridge2.0-0 \
+            libatk1.0-0 \
+            libcairo2 \
+            libcups2 \
+            libgbm1 \
+            libgtk-3-0 \
+            libnss3 \
+            libpango-1.0-0 \
+            libxcomposite1 \
+            libxdamage1 \
+            libxfixes3 \
+            libxrandr2 \
+            fonts-liberation \
+            xdg-utils
 
-    // Fill password
-    await page.type('input[type="password"]', '12345678');
-    console.log('Filled password');
+      - name: Run Automation
+        run: node deepseek.js || true # Continue even if the script fails
 
-    // Click the "I confirm" checkbox
-    await page.click('input[type="checkbox"]');
-    console.log('Clicked "I confirm" checkbox');
-
-    // Take a screenshot before login
-    await page.screenshot({ path: 'before_login.png' });
-    console.log('Screenshot saved: before_login.png');
-
-    // Submit login form
-    await Promise.all([
-      page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 15000 }), // Increased timeout
-      page.click('button:has-text("Log in")')
-    ]);
-    console.log('Submitted login form');
-
-    // Wait for 5 seconds after login
-    await page.waitForTimeout(5000);
-    console.log('Waited 5 seconds after login');
-
-    // Take a screenshot after login
-    await page.screenshot({ path: 'after_login.png' });
-    console.log('Screenshot saved: after_login.png');
-
-  } catch (error) {
-    console.error('Error:', error.message);
-
-    // Take screenshot for debugging (if page is defined)
-    if (page) {
-      await page.screenshot({ path: 'error.png' });
-      console.log('Screenshot saved: error.png');
-    }
-    
-    process.exit(1);
-  } finally {
-    await browser.close();
-  }
-})();
+      - name: Upload Screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: automation-screenshots
+          path: |
+            loaded_page.png
+            before_login.png
+            after_login.png
+            error.png
