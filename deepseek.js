@@ -20,15 +20,15 @@ import puppeteer from 'puppeteer';
     console.log('Screenshot saved: loaded_page.png');
 
     // Wait for the email input field to be visible
-    await page.waitForSelector('input[name="email"]', { visible: true, timeout: 10000 });
+    await page.waitForSelector('input[type="text"]', { visible: true, timeout: 10000 });
     console.log('Email input field found');
 
     // Fill email
-    await page.type('input[name="email"]', 'alon123tt@gmail.com');
+    await page.type('input[type="text"]', 'alon123tt@gmail.com');
     console.log('Filled email');
 
     // Fill password
-    await page.type('input[name="password"]', '12345678');
+    await page.type('input[type="password"]', '12345678');
     console.log('Filled password');
 
     // Click the "I confirm" checkbox
