@@ -11,33 +11,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Clean installation
-        run: |
-          rm -rf node_modules
-          rm -f package-lock.json
-
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: 'npm'
 
-      - name: Install system dependencies
+      - name: Clean install
+        run: |
+          rm -rf node_modules
+          npm ci
+
+      - name: Install Chromium
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            chromium-browser \
-            libnss3 \
-            libxcomposite1 \
-            libxrandr2 \
-            libgbm1 \
-            libgtk-3-0 \
-            libasound2 \
-            libatk-bridge2.0-0
-
-      - name: Install npm packages
-        run: |
-          npm install
-          npm fund
+          sudo apt-get install -y chromium-browser
 
       - name: Run scraper
         run: npm start
@@ -48,5 +35,5 @@ jobs:
           name: results
           path: |
             cars.json
-            error-logs/
+            error.log
           retention-days: 1
