@@ -51,4 +51,5 @@ jobs:
             cars.json
             error.log
             error-logs/
+            screenshots/
           retention-days: 1
