@@ -29,82 +29,76 @@ const log = (message, type = 'info') => {
   try {
     page = await browser.newPage();
 
-    // 1. Browser Configuration
-    log('Setting up browser fingerprint');
+    // 1. Advanced Fingerprinting
+    log('Configuring browser fingerprint');
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36');
-    await page.setExtraHTTPHeaders({
-      'Accept-Language': 'en-US,en;q=0.9',
-      'Sec-CH-UA': '"Chromium";v="122", "Not:A-Brand";v="24"'
+    await page.evaluateOnNewDocument(() => {
+      Object.defineProperty(navigator, 'webdriver', { get: () => false });
+      Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4] });
+      Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
     });
 
-    // 2. Initial Navigation
-    log('Navigating to target');
-    await page.goto('https://chat.deepseek.com/sign_in', {
-      waitUntil: 'networkidle2',
-      timeout: 60000
-    });
+    // 2. Navigation with Retry
+    log('Navigating with Cloudflare bypass');
+    let loaded = false;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        await page.goto('https://chat.deepseek.com/sign_in', {
+          waitUntil: 'networkidle2',
+          timeout: 40000
+        });
+        loaded = true;
+        break;
+      } catch (error) {
+        log(`Navigation attempt ${attempt} failed: ${error.message}`);
+        await page.waitForTimeout(5000);
+      }
+    }
+    if (!loaded) throw new Error('Failed to load page after 3 attempts');
     await page.screenshot({ path: '01-initial.png' });
 
-    // 3. CAPTCHA Handling
+    // 3. Enhanced CAPTCHA Detection
     let captchaSolved = false;
     try {
-      log('Detecting CAPTCHA elements');
-      const captchaFrame = await page.waitForSelector('iframe[src*="challenges.cloudflare.com"], iframe[src*="hcaptcha.com"]', {
-        visible: true,
-        timeout: 30000
-      });
-      const frame = await captchaFrame.contentFrame();
-      
-      // Enhanced Sitekey Extraction
-      log('Extracting sitekey using multiple methods');
-      const sitekey = await frame.evaluate(() => {
-        // Method 1: data-sitekey attribute
-        const directElement = document.querySelector('[data-sitekey]');
-        if (directElement) return directElement.dataset.sitekey;
-        
-        // Method 2: Iframe URL parameter
-        const iframe = document.querySelector('iframe');
-        if (iframe?.src.includes('sitekey=')) {
-          return new URL(iframe.src).searchParams.get('sitekey');
-        }
-        
-        // Method 3: Hidden input field
-        const hiddenInput = document.querySelector('input[name="sitekey"]');
-        if (hiddenInput) return hiddenInput.value;
-        
-        // Method 4: Script variable
-        const scripts = Array.from(document.scripts);
-        for (const script of scripts) {
-          const match = script.textContent.match(/sitekey["']?:["']([^"']+)/);
-          if (match) return match[1];
-        }
-        
-        throw new Error('Sitekey not found in any location');
+      log('Detecting Cloudflare overlay');
+      await page.waitForFunction(() => {
+        return document.querySelector('#challenge-form, .cloudflare-form') ||
+               document.body.textContent.includes('Verify you are human') ||
+               document.querySelector('div[data-translate="challenge_page"]');
+      }, { timeout: 45000 });
+
+      log('Cloudflare challenge detected');
+      await page.screenshot({ path: '02-challenge-detected.png' });
+
+      // 4. Alternative CAPTCHA Handling
+      log('Solving Cloudflare Turnstile');
+      const sitekey = await page.evaluate(() => {
+        const turnstileFrame = document.querySelector('iframe[src*="challenges.cloudflare.com/turnstile"]');
+        return turnstileFrame?.src.match(/sitekey=([^&]+)/)?.[1];
       });
 
+      if (!sitekey) throw new Error('Failed to extract Turnstile sitekey');
       log(`Extracted sitekey: ${sitekey}`);
-      await page.screenshot({ path: '02-sitekey-extracted.png' });
 
-      // 4. 2Captcha API Call
-      log('Checking 2Captcha balance');
-      const balance = await solver.getBalance();
-      log(`Balance: $${balance.data}`);
-      
-      log('Solving CAPTCHA...');
+      // 5. 2Captcha API Integration
+      log('Solving with 2Captcha');
       const { data: solution } = await solver.turnstile(sitekey, page.url());
       log(`Received solution: ${solution.substring(0,15)}...`);
 
-      // 5. Solution Injection
+      // 6. Solution Injection
       log('Injecting solution');
       await page.evaluate((solution) => {
-        document.querySelector('input[name="cf-turnstile-response"]').value = solution;
-        document.querySelector('textarea[name="h-captcha-response"]').value = solution;
+        const script = document.createElement('script');
+        script.innerHTML = `
+          document.querySelector('input[name="cf-turnstile-response"]').value = '${solution}';
+          document.querySelector('#challenge-form').submit();
+        `;
+        document.body.appendChild(script);
       }, solution);
-      
-      log('Submitting solution');
-      await page.click('button[type="submit"]');
+
       await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 30000 });
       captchaSolved = true;
+      log('Cloudflare bypass successful');
       await page.screenshot({ path: '03-post-captcha.png' });
 
     } catch (error) {
@@ -113,13 +107,16 @@ const log = (message, type = 'info') => {
       throw error;
     }
 
-    // 6. Login Execution
+    // 7. Login Execution
     if (!captchaSolved) throw new Error('CAPTCHA unresolved');
-    log('Filling credentials');
+    log('Performing login');
+    await page.waitForSelector('input[name="email"]', { timeout: 15000 });
+    
     await page.type('input[name="email"]', 'alon123tt@gmail.com', { delay: 50 });
     await page.type('input[name="password"]', '12345678', { delay: 50 });
     await page.click('input[type="checkbox"]');
     await page.click('button[type="submit"]');
+    
     await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 15000 });
     await page.screenshot({ path: '05-success.png' });
 
