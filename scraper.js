@@ -1,4 +1,3 @@
-// scraper.js
 import puppeteer from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import { Solver } from '2captcha';
@@ -18,14 +17,16 @@ const config = {
     captchaCheckbox: '.hcaptcha-box',
     captchaResponse: 'textarea[name="h-captcha-response"]',
     submitButton: 'button[type="submit"]',
-    mainContent: '#main_content, .main_content, main'
+    mainContent: '#main_page_wrapper, #main_content, main, [role="main"]',
+    bodyContent: 'body'
   },
   delays: {
     short: 5000,
     medium: 15000,
     long: 30000
   },
-  headless: true
+  headless: true,
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
 };
 
 async function captureScreenshot(page, stepName) {
@@ -51,7 +52,7 @@ async function handleError(error, page, stepName) {
       step: stepName,
       screenshot: page ? await captureScreenshot(page, `error-${stepName}`) : null,
       html: page ? await page.content() : null,
-      url: page ? page.url() : null
+      url: page ? await page.url() : null
     };
 
     fs.writeFileSync(
@@ -86,6 +87,13 @@ async function safeAction(page, action, stepName, options = {}) {
   } catch (error) {
     await captureScreenshot(page, `error_${stepName}`);
     await handleError(error, page, stepName);
+    
+    // Additional diagnostics
+    if (page) {
+      console.error('Current URL:', await page.url());
+      console.error('Page title:', await page.title());
+    }
+    
     throw error;
   }
 }
@@ -109,7 +117,6 @@ async function solveCaptcha(page) {
 
   await page.evaluate((token) => {
     document.querySelector('textarea[name="h-captcha-response"]').value = token;
-    document.querySelector('input[name="g-recaptcha-response"]').value = token;
   }, token);
 
   await safeAction(page,
@@ -119,6 +126,51 @@ async function solveCaptcha(page) {
   );
 }
 
+async function initializeBrowser() {
+  const browser = await puppeteer
+    .use(StealthPlugin())
+    .launch({
+      headless: config.headless ? "new" : false,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-web-security',
+        '--disable-features=IsolateOrigins,site-per-process',
+        '--disable-blink-features=AutomationControlled'
+      ],
+      ignoreHTTPSErrors: true,
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined
+    });
+
+  const page = await browser.newPage();
+  
+  await page.setExtraHTTPHeaders({
+    'Accept-Language': 'en-US,en;q=0.9',
+  });
+  
+  await page.setUserAgent(config.userAgent);
+  await page.setViewport({ 
+    width: 1366, 
+    height: 768,
+    deviceScaleFactor: 1,
+    isMobile: false,
+    hasTouch: false
+  });
+
+  await page.setRequestInterception(true);
+  page.on('request', (req) => {
+    const resourceType = req.resourceType();
+    if (['image', 'stylesheet', 'font'].includes(resourceType)) {
+      req.abort();
+    } else {
+      req.continue();
+    }
+  });
+
+  return { browser, page };
+}
+
 (async () => {
   let browser;
   try {
@@ -126,62 +178,32 @@ async function solveCaptcha(page) {
       throw new Error('CAPTCHA_API_KEY environment variable is missing');
     }
 
-    browser = await puppeteer
-      .use(StealthPlugin())
-      .launch({
-        headless: config.headless ? "new" : false,
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--single-process',
-          '--no-zygote',
-          '--disable-gpu',
-          '--disable-infobars',
-          '--window-position=0,0',
-          '--ignore-certificate-errors',
-          '--ignore-certificate-errors-spki-list'
-        ],
-        ignoreHTTPSErrors: true,
-        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined
-      });
+    const { browser: b, page } = await initializeBrowser();
+    browser = b;
 
-    const page = await browser.newPage();
-    await page.setExtraHTTPHeaders({
-      'Accept-Language': 'en-US,en;q=0.9',
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
-    });
-    
-    await page.setViewport({ width: 1366, height: 768 });
-    await page.setRequestInterception(true);
-    
-    page.on('request', (req) => {
-      if (['image', 'stylesheet', 'font'].includes(req.resourceType())) {
-        req.abort();
-      } else {
-        req.continue();
-      }
-    });
-
-    // Navigation with multiple verification points
+    // Step 1: Navigate and verify content
     await safeAction(page, 
       async () => {
         await page.goto(config.baseUrl, { 
-          waitUntil: 'domcontentloaded',
-          timeout: config.delays.long 
+          waitUntil: 'networkidle2',
+          timeout: config.delays.long,
+          referer: 'https://www.google.com/'
         });
         
-        // Verify either main content or captcha presence
         await Promise.race([
-          page.waitForSelector(config.selectors.mainContent, { timeout: config.delays.medium }),
-          page.waitForSelector(config.selectors.captchaFrame, { timeout: config.delays.medium })
+          page.waitForSelector(config.selectors.mainContent, { 
+            timeout: config.delays.medium 
+          }),
+          page.waitForSelector(config.selectors.captchaFrame, { 
+            timeout: config.delays.medium 
+          })
         ]);
       }, 
       '1_initial_navigation',
-      { selector: `${config.selectors.mainContent}, ${config.selectors.captchaFrame}`, timeout: config.delays.long }
+      { selector: `${config.selectors.mainContent}, ${config.selectors.captchaFrame}` }
     );
 
-    // Handle potential CAPTCHA
+    // Step 2: CAPTCHA handling
     if (await page.$(config.selectors.captchaFrame)) {
       await safeAction(page,
         async () => solveCaptcha(page),
@@ -189,38 +211,38 @@ async function solveCaptcha(page) {
         { timeout: config.delays.long }
       );
       
-      // Post-CAPTCHA verification
       await safeAction(page,
-        async () => page.waitForSelector(config.selectors.mainContent, { timeout: config.delays.long }),
-        '3_post_captcha_verification',
+        async () => page.waitForSelector(config.selectors.mainContent),
+        '3_post_captcha_verify',
         { selector: config.selectors.mainContent }
       );
     }
 
-    // Price filter interaction
+    // Step 3: Price filter interaction
     await safeAction(page,
       async () => {
-        await page.waitForNetworkIdle({ timeout: config.delays.short });
         const priceFilter = await page.$(config.selectors.priceFilter);
         await priceFilter.click({ clickCount: 3 });
         await priceFilter.type(config.maxPrice.toString());
         await page.keyboard.press('Enter');
-        await page.waitForNavigation({ waitUntil: 'networkidle0', timeout: config.delays.long });
+        await page.waitForNavigation({ waitUntil: 'networkidle2' });
       },
       '4_price_filter',
       { selector: config.selectors.priceFilter }
     );
 
-    // Results extraction with retry logic
+    // Step 4: Results extraction
     const cars = await safeAction(page,
       async () => {
-        await page.waitForSelector(config.selectors.listItem, { timeout: config.delays.long });
+        await page.waitForSelector(config.selectors.listItem, { 
+          timeout: config.delays.long 
+        });
         return page.$$eval(config.selectors.listItem, items => 
           items.map(item => ({
             title: item.querySelector('[data-test-id="title"]')?.textContent?.trim() || '',
-            price: (item.querySelector('[data-test-id="price"]')?.textContent?.replace(/\D/g, '') || '0').trim(),
+            price: item.querySelector('[data-test-id="price"]')?.textContent?.replace(/\D/g, '') || '0',
             link: item.querySelector('a[href^="/vehicles/cars/"]')?.href || ''
-          })).filter(car => parseInt(car.price) <= config.maxPrice)
+          })).filter(car => parseInt(car.price) <= 10000)
         );
       },
       '5_data_extraction',
