@@ -13,14 +13,10 @@ jobs:
           node-version: 20.x
           cache: 'npm'
           
-      - name: Install Modern Dependencies
+      - name: Install Essentials
         run: |
-          npm install puppeteer@22.11.0 puppeteer-extra@3.3.6 puppeteer-extra-plugin-stealth@2.11.2
-          sudo apt-get install -y \
-            libgbm-dev \
-            libxshmfence-dev \
-            libasound2 \
-            libnss3
+          npm install puppeteer@22.11.0 puppeteer-extra@3.3.6
+          sudo apt-get install -y libgbm-dev
 
       - name: Run Automation
         run: node deepseek.js || true
