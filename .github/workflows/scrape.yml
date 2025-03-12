@@ -6,6 +6,7 @@ jobs:
     runs-on: ubuntu-22.04
     env:
       CAPTCHA_API_KEY: ${{ secrets.CAPTCHA_API_KEY }}
+      PUPPETEER_EXECUTABLE_PATH: '/usr/bin/google-chrome'
 
     steps:
       - uses: actions/checkout@v4
@@ -19,6 +20,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
+            google-chrome-stable \
             libnss3 \
             libxcomposite1 \
             libxrandr2 \
@@ -28,10 +30,12 @@ jobs:
             libatk-bridge2.0-0
 
       - name: Install npm packages
-        run: npm ci --no-audit
+        run: |
+          npm ci --no-audit --legacy-peer-deps
+          npm rebuild
 
       - name: Run scraper
-        timeout-minutes: 10
+        timeout-minutes: 15
         run: npm start
 
       - uses: actions/upload-artifact@v4
