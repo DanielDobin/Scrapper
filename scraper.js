@@ -14,7 +14,13 @@ const config = {
     priceFilter: 'input[data-test-id="price-to"]',
     listItem: 'div[data-test-id="feed-item"]',
     captchaFrame: 'iframe[src*="hcaptcha"]',
-    captchaResponse: 'textarea[name="h-captcha-response"]'
+    captchaResponse: 'textarea[name="h-captcha-response"]',
+    submitButton: 'button[type="submit"]'
+  },
+  delays: {
+    short: 1000,
+    medium: 3000,
+    long: 5000
   }
 };
 
@@ -23,10 +29,8 @@ async function handleError(error, page) {
   const timestamp = Date.now();
   
   try {
-    if (!fs.existsSync(errorDir)) {
-      fs.mkdirSync(errorDir, { recursive: true });
-    }
-
+    if (!fs.existsSync(errorDir)) fs.mkdirSync(errorDir, { recursive: true });
+    
     fs.writeFileSync(
       `${errorDir}/error-${timestamp}.json`,
       JSON.stringify({
@@ -44,6 +48,15 @@ async function handleError(error, page) {
     }
   } catch (logError) {
     console.error('Error logging failed:', logError);
+  }
+}
+
+async function safeWaitForSelector(page, selector, timeout = 10000) {
+  try {
+    await page.waitForSelector(selector, { timeout });
+    return true;
+  } catch (error) {
+    throw new Error(`No element found for selector: ${selector}`);
   }
 }
 
@@ -68,25 +81,53 @@ async function handleError(error, page) {
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36');
     await page.setViewport({ width: 1366, height: 768 });
 
-    await page.goto(config.baseUrl, { waitUntil: 'networkidle2', timeout: 60000 });
+    console.log('🌐 Navigating to page...');
+    await page.goto(config.baseUrl, { 
+      waitUntil: 'networkidle2', 
+      timeout: 60000 
+    });
 
+    // CAPTCHA handling with retries
+    let captchaSolved = false;
     if (await page.$(config.selectors.captchaFrame)) {
-      const { data } = await captchaSolver.hcaptcha('ae73173b-7003-44e0-bc87-654d0dab8b75', config.baseUrl);
-      await page.$eval(config.selectors.captchaResponse, (el, token) => el.value = token, data);
-      await page.click('button[type="submit"]');
-      await page.waitForNavigation({ waitUntil: 'networkidle2' });
+      console.log('🔍 CAPTCHA detected');
+      try {
+        const { data } = await captchaSolver.hcaptcha('ae73173b-7003-44e0-bc87-654d0dab8b75', config.baseUrl);
+        await page.$eval(config.selectors.captchaResponse, (el, token) => el.value = token, data);
+        await page.click(config.selectors.submitButton);
+        await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: config.delays.long });
+        captchaSolved = true;
+        console.log('✅ CAPTCHA solved successfully');
+      } catch (captchaError) {
+        throw new Error(`CAPTCHA solving failed: ${captchaError.message}`);
+      }
     }
 
-    await page.type(config.selectors.priceFilter, config.maxPrice.toString());
+    // Wait for price filter with retries
+    console.log('🔍 Looking for price filter...');
+    await safeWaitForSelector(page, config.selectors.priceFilter);
+    
+    console.log('💵 Applying price filter...');
+    const priceFilter = await page.$(config.selectors.priceFilter);
+    await priceFilter.type(config.maxPrice.toString());
     await page.keyboard.press('Enter');
-    await page.waitForNavigation({ waitUntil: 'networkidle2' });
+    
+    // Wait for navigation and results
+    console.log('⏳ Waiting for results...');
+    await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: config.delays.long });
+    
+    // Verify results load
+    console.log('🔍 Verifying results...');
+    await safeWaitForSelector(page, config.selectors.listItem);
 
+    // Data scraping
+    console.log('📊 Extracting car listings...');
     const cars = await page.$$eval(config.selectors.listItem, items => 
       items.map(item => ({
         title: item.querySelector('[data-test-id="title"]')?.textContent?.trim() || '',
         price: item.querySelector('[data-test-id="price"]')?.textContent?.replace(/\D/g, '') || '0',
         link: item.querySelector('a')?.href || ''
-      })).filter(car => parseInt(car.price) <= config.maxPrice)
+      })).filter(car => parseInt(car.price) <= 10000)
     );
 
     fs.writeFileSync('cars.json', JSON.stringify(cars, null, 2));
