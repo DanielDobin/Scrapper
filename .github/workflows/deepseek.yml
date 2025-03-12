@@ -40,7 +40,7 @@ jobs:
             xdg-utils
 
       - name: Run Automation
-        run: node deepseek.js
+        run: node deepseek.js || true # Continue even if the script fails
 
       - name: Upload Screenshots
         uses: actions/upload-artifact@v4
