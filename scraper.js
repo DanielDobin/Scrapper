@@ -7,6 +7,10 @@ import { dirname } from 'path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
+// Ensure directories exist
+fs.mkdirSync(`${__dirname}/screenshots`, { recursive: true });
+fs.mkdirSync(`${__dirname}/error-logs`, { recursive: true });
+
 const config = {
   maxPrice: 10000,
   baseUrl: 'https://www.yad2.co.il/vehicles/cars',
@@ -17,13 +21,12 @@ const config = {
     captchaCheckbox: '.hcaptcha-box',
     captchaResponse: 'textarea[name="h-captcha-response"]',
     submitButton: 'button[type="submit"]',
-    mainContent: '#feed_content, #main_layout, #main_content, main',
+    mainContent: '#feed_content, #main_layout, main',
     bodyContent: 'body'
   },
   delays: {
-    short: 10000,
-    medium: 30000,
-    long: 60000
+    navigation: 120000,  // 2 minutes
+    action: 30000
   },
   headless: true,
   userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
@@ -45,20 +48,25 @@ async function handleError(error, page, stepName) {
     html: page ? await page.content() : null,
     url: page ? await page.url() : null
   };
-  fs.writeFileSync(`${__dirname}/error-${Date.now()}.json`, JSON.stringify(errorData, null, 2));
+  fs.writeFileSync(`${__dirname}/error-logs/error-${Date.now()}.json`, JSON.stringify(errorData, null, 2));
 }
 
-async function safeAction(page, action, stepName, options = {}) {
-  try {
-    console.log(`🔍 [${stepName}] Starting...`);
-    await action();
-    await captureScreenshot(page, `success-${stepName}`);
-  } catch (error) {
-    console.error(`❌ [${stepName}] Failed: ${error.message}`);
-    await captureScreenshot(page, `error-${stepName}`);
-    await handleError(error, page, stepName);
-    throw error;
+async function safeNavigation(page, url) {
+  console.log(`🌐 Navigating to: ${url}`);
+  const response = await page.goto(url, {
+    waitUntil: 'domcontentloaded',
+    timeout: config.delays.navigation
+  });
+
+  if (!response.ok()) {
+    throw new Error(`Navigation failed: ${response.status()} ${response.statusText()}`);
   }
+
+  console.log('✅ Page loaded successfully');
+  console.log('Final URL:', page.url());
+  console.log('Page title:', await page.title());
+  
+  await captureScreenshot(page, 'loaded-page');
 }
 
 async function solveCaptcha(page) {
@@ -92,7 +100,6 @@ async function initializeBrowser() {
   await page.setUserAgent(config.userAgent);
   await page.setViewport({ width: 1366, height: 768 });
   
-  // Critical: Only block images
   await page.setRequestInterception(true);
   page.on('request', (req) => {
     req.resourceType() === 'image' ? req.abort() : req.continue();
@@ -107,50 +114,37 @@ async function initializeBrowser() {
     const { browser: b, page } = await initializeBrowser();
     browser = b;
 
-    // Step 1: Force navigation and verify
-    await safeAction(page, async () => {
-      await page.goto(config.baseUrl, {
-        waitUntil: 'domcontentloaded',
-        timeout: 60000,
-        referer: 'https://www.google.com/'
-      });
-      
-      // Verify actual page content
-      await page.waitForFunction(
-        () => document.title.includes('Yad2') || document.querySelector('#feed_content'),
-        { timeout: 60000 }
-      );
-      
-      console.log('Loaded URL:', await page.url());
-      console.log('Page title:', await page.title());
-    }, 'navigation');
+    // Step 1: Force navigation
+    await safeNavigation(page, config.baseUrl);
 
-    // Step 2: Handle CAPTCHA if present
+    // Step 2: Handle CAPTCHA
     if (await page.$(config.selectors.captchaFrame)) {
-      await safeAction(page, () => solveCaptcha(page), 'captcha');
-      await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 60000 });
+      console.log('🔍 CAPTCHA detected');
+      await solveCaptcha(page);
+      await page.waitForNavigation({ timeout: config.delays.navigation });
+      await captureScreenshot(page, 'after-captcha');
     }
 
-    // Step 3: Interact with page
-    await safeAction(page, async () => {
-      await page.type(config.selectors.priceFilter, config.maxPrice.toString());
-      await page.keyboard.press('Enter');
-      await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 60000 });
-    }, 'price-filter');
-
+    // Step 3: Set price filter
+    console.log('🔧 Setting price filter');
+    const priceInput = await page.$(config.selectors.priceFilter);
+    await priceInput.click({ clickCount: 3 });
+    await priceInput.type(config.maxPrice.toString());
+    await priceInput.press('Enter');
+    await page.waitForNavigation({ timeout: config.delays.navigation });
+    
     // Step 4: Extract data
-    const results = await safeAction(page, async () => 
-      page.$$eval(config.selectors.listItem, items => 
-        items.map(item => ({
-          title: item.querySelector('[data-test-id="title"]')?.textContent?.trim(),
-          price: item.querySelector('[data-test-id="price"]')?.textContent?.replace(/\D/g, ''),
-          link: item.querySelector('a')?.href
-        })).filter(car => parseInt(car.price) <= 10000)
-      ), 'data-extraction'
+    console.log('📦 Extracting listings');
+    const listings = await page.$$eval(config.selectors.listItem, items => 
+      items.map(item => ({
+        title: item.querySelector('[data-test-id="title"]')?.textContent?.trim(),
+        price: item.querySelector('[data-test-id="price"]')?.textContent?.replace(/\D/g, ''),
+        link: item.querySelector('a')?.href
+      })).filter(car => parseInt(car.price) <= 10000)
     );
-
-    fs.writeFileSync('cars.json', JSON.stringify(results, null, 2));
-    console.log(`✅ Found ${results.length} listings`);
+    
+    fs.writeFileSync('cars.json', JSON.stringify(listings, null, 2));
+    console.log(`✅ Success! Found ${listings.length} listings`);
 
   } catch (error) {
     console.error('💀 Critical failure:', error.message);
