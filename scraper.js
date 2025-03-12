@@ -19,7 +19,9 @@ const config = {
       'input[data-test-id="price-to"]',
       'input[name="price_to"]',
       'input[aria-label="מחיר עד"]',
-      '#price_to'
+      '#price_to',
+      'input[data-testid="price-to"]',
+      '.price-to-input'
     ].join(','),
     listItem: '[data-test-id="feed-item"]',
     captchaFrame: 'iframe[src*="hcaptcha"]',
@@ -93,23 +95,35 @@ async function setPriceFilter(page) {
   console.log('🔧 Setting price filter');
   await captureScreenshot(page, 'before-price-filter');
   
-  const priceInput = await page.waitForSelector(config.selectors.priceFilter, {
-    visible: true,
-    timeout: config.delays.action
-  }).catch(() => {
-    throw new Error(`Price filter not found using selectors: ${config.selectors.priceFilter}`);
-  });
+  try {
+    const priceInput = await page.waitForSelector(config.selectors.priceFilter, {
+      visible: true,
+      timeout: config.delays.action
+    });
 
-  await priceInput.click({ clickCount: 3 });
-  await priceInput.type(config.maxPrice.toString());
-  await priceInput.press('Enter');
-  
-  await page.waitForNavigation({ 
-    waitUntil: 'networkidle2',
-    timeout: config.delays.navigation 
-  });
-  
-  await captureScreenshot(page, 'after-price-filter');
+    // Dump element HTML for debugging
+    const elementHTML = await priceInput.evaluate(el => el.outerHTML);
+    fs.writeFileSync(`${__dirname}/error-logs/price-filter-element.html`, elementHTML);
+
+    await priceInput.click({ clickCount: 3 });
+    await priceInput.type(config.maxPrice.toString());
+    await priceInput.press('Enter');
+    
+    await page.waitForNavigation({ 
+      waitUntil: 'networkidle2',
+      timeout: config.delays.navigation 
+    });
+    
+    await captureScreenshot(page, 'after-price-filter');
+  } catch (error) {
+    // Dump full page HTML and element screenshot
+    const html = await page.content();
+    const htmlPath = `${__dirname}/error-logs/page-dump-${Date.now()}.html`;
+    fs.writeFileSync(htmlPath, html);
+    
+    await captureScreenshot(page, 'price-filter-error');
+    throw new Error(`Price filter failed. Saved HTML to: ${htmlPath}\n${error.message}`);
+  }
 }
 
 async function extractListings(page) {
